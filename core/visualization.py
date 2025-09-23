@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+import re
+from pathlib import Path
+from typing import Iterable, Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
+_DEFAULT_OUTPUT_DIR = Path("feature_scaling") / "outputs"
 
 
 def _validate_columns(df: pd.DataFrame, columns: Iterable[str]) -> None:
@@ -16,12 +20,32 @@ def _validate_columns(df: pd.DataFrame, columns: Iterable[str]) -> None:
         raise KeyError(f"Missing columns in DataFrame: {missing_fmt}")
 
 
+def _sanitize_filename(title: str, suffix: str) -> str:
+    base = re.sub(r"[^\w.-]+", "_", title.strip().lower())
+    base = base.strip("._") or "plot"
+    suffix = suffix.strip("._")
+    if suffix:
+        return f"{base}_{suffix}.png"
+    return f"{base}.png"
+
+
+def _save_figure(fig: plt.Figure, output_dir: Path | str | None, filename: str) -> Path:
+    directory = Path(output_dir) if output_dir is not None else _DEFAULT_OUTPUT_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    filepath = directory / filename
+    fig.savefig(filepath, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    return filepath
+
+
 def features_values_distribution(
     df: pd.DataFrame,
     original_features: pd.DataFrame,
     title: str,
-) -> None:
-    """Plot histograms comparing original and transformed feature distributions.
+    *,
+    output_dir: Path | str | None = None,
+) -> Path:
+    """Create paired histograms for original vs transformed features and save to PNG.
 
     Parameters
     ----------
@@ -31,9 +55,17 @@ def features_values_distribution(
         DataFrame with the original feature values.
     title
         Label describing the type of transformation applied.
+    output_dir
+        Target directory for the generated plot. Defaults to
+        ``feature_scaling/outputs`` when None.
+
+    Returns
+    -------
+    Path
+        Location of the saved PNG file.
     """
 
-    cols = list(original_features.columns)
+    cols: Sequence[str] = list(original_features.columns)
     if not cols:
         raise ValueError("original_features must contain at least one column")
 
@@ -48,13 +80,15 @@ def features_values_distribution(
         transformed_data = df[col].dropna()
 
         axes[i, 0].hist(orig_data, bins=50, color="skyblue", edgecolor="black")
-        axes[i, 0].set_title(f"{col} – original data")
+        axes[i, 0].set_title(f"{col} - original data")
 
         axes[i, 1].hist(transformed_data, bins=50, color="orange", edgecolor="black")
-        axes[i, 1].set_title(f"{col} – {title}")
+        axes[i, 1].set_title(f"{col} - {title}")
 
-    plt.tight_layout()
-    plt.show()
+    fig.tight_layout()
+
+    filename = _sanitize_filename(title or "features", "comparison")
+    return _save_figure(fig, output_dir, filename)
 
 
 def plot_features_distribution_grid(
@@ -62,8 +96,10 @@ def plot_features_distribution_grid(
     original_features: pd.DataFrame,
     title: str,
     n_features_per_row: int = 3,
-) -> None:
-    """Plot a grid of histograms comparing original vs transformed features.
+    *,
+    output_dir: Path | str | None = None,
+) -> Path:
+    """Create histogram grid for original vs transformed features and save to PNG.
 
     Parameters
     ----------
@@ -75,12 +111,20 @@ def plot_features_distribution_grid(
         Label describing the transformation.
     n_features_per_row
         How many features to display per row (each feature uses two subplots).
+    output_dir
+        Target directory for the generated plot. Defaults to
+        ``feature_scaling/outputs`` when None.
+
+    Returns
+    -------
+    Path
+        Location of the saved PNG file.
     """
 
     if n_features_per_row <= 0:
         raise ValueError("n_features_per_row must be a positive integer")
 
-    cols = list(original_features.columns)
+    cols: Sequence[str] = list(original_features.columns)
     if not cols:
         raise ValueError("original_features must contain at least one column")
 
@@ -91,23 +135,26 @@ def plot_features_distribution_grid(
     n_cols = n_features_per_row * 2
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
-    axes = np.array(axes).reshape(-1)
+    flat_axes = np.array(axes).reshape(-1)
 
     for i, col in enumerate(cols):
         orig_data = original_features[col].dropna()
         transformed_data = df[col].dropna()
 
-        ax_orig = axes[i * 2]
+        ax_orig = flat_axes[i * 2]
         ax_orig.hist(orig_data, bins=50, color="skyblue", edgecolor="black")
-        ax_orig.set_title(f"{col} – original", fontsize=9)
+        ax_orig.set_title(f"{col} - original", fontsize=9)
 
-        ax_trans = axes[i * 2 + 1]
+        ax_trans = flat_axes[i * 2 + 1]
         ax_trans.hist(transformed_data, bins=50, color="orange", edgecolor="black")
-        ax_trans.set_title(f"{col} – {title}", fontsize=9)
+        ax_trans.set_title(f"{col} - {title}", fontsize=9)
 
-    for j in range(i * 2 + 2, len(axes)):
-        fig.delaxes(axes[j])
+    used_slots = len(cols) * 2
+    for ax in flat_axes[used_slots:]:
+        fig.delaxes(ax)
 
-    plt.suptitle(f"Features distribution: {title}", fontsize=16)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+    fig.suptitle(f"Features distribution: {title}", fontsize=16)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    filename = _sanitize_filename(title or "features", "grid")
+    return _save_figure(fig, output_dir, filename)

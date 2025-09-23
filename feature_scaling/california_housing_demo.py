@@ -34,7 +34,7 @@ def _display_dataframe(
 
 
 def run_demo(n_features_per_row: int = 3) -> None:
-    """Fetch the California Housing dataset and visualise Yeo–Johnson scaling."""
+    """Fetch the California Housing dataset and visualise Yeo-Johnson scaling."""
 
     data = fetch_california_housing(as_frame=True)
     original_frame = data.frame
@@ -50,15 +50,17 @@ def run_demo(n_features_per_row: int = 3) -> None:
 
     _display_dataframe(
         transformed_frame,
-        "Data after Yeo–Johnson transformation (first rows)",
+        "Data after Yeo-Johnson transformation (first rows)",
     )
 
-    plot_features_distribution_grid(
+    plot_path = plot_features_distribution_grid(
         transformed_frame,
         features,
         title="Yeo-Johnson applied for California Housing set",
         n_features_per_row=n_features_per_row,
     )
+
+    print(f"\nHistogram grid saved to: {plot_path}")
 
 
 if __name__ == "__main__":
