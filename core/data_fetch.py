@@ -7,6 +7,7 @@ from typing import Iterable, List, Sequence
 
 import pandas as pd
 import yfinance as yf
+from ta.momentum import RSIIndicator
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,14 @@ def get_companies_quotes(companies_list: Iterable[dict | Company], period: str =
         if frame.empty:
             continue
         frame = frame.copy()
+
+        frame["OpenCloseReturn"] = frame["Close"].sub(frame["Open"]).div(frame["Open"]).mul(100)
+        intraday_denominator = frame["Low"].mask(frame["Low"] == 0)
+        frame["IntradayRange"] = frame["High"].sub(frame["Low"]).div(intraday_denominator).mul(100)
+        frame["RSI_14"] = RSIIndicator(close=frame["Close"], window=14).rsi()
+        volume_ma14 = frame["Volume"].rolling(window=14).mean()
+        frame["Volume_vs_MA14"] = frame["Volume"].div(volume_ma14.mask(volume_ma14 == 0))
+
         frame["ticker"] = company.ticker
         frames.append(frame)
 

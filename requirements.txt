@@ -28,6 +28,7 @@ scikit-learn==1.7.2
 scipy==1.16.2
 six==1.17.0
 soupsieve==2.8
+ta==0.11.0
 threadpoolctl==3.6.0
 typing_extensions==4.15.0
 tzdata==2025.2
