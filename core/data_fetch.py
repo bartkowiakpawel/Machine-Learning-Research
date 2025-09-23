@@ -1,113 +1,84 @@
-﻿"""Data fetching utilities built on top of yfinance."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Iterable, List, Sequence
+"""Simplified Yahoo Finance fetch utilities."""
 
 import pandas as pd
 import yfinance as yf
-from ta.momentum import RSIIndicator
 
 
-@dataclass(frozen=True)
-class Company:
-    """Simple container for a company's ticker symbol."""
-
-    ticker: str
-
-
-def _ensure_companies(sequence: Iterable[dict | Company]) -> List[Company]:
-    companies: List[Company] = []
-    for item in sequence:
-        if isinstance(item, Company):
-            companies.append(item)
-        elif isinstance(item, dict) and "ticker" in item:
-            companies.append(Company(ticker=str(item["ticker"]).upper()))
+def _collect_tickers(items):
+    tickers = []
+    for item in items:
+        if isinstance(item, str):
+            tickers.append(item.strip().upper())
+        elif isinstance(item, dict):
+            tickers.append(str(item.get("ticker", "")).strip().upper())
         else:
-            raise ValueError("Each company entry must provide a 'ticker'.")
-    if not companies:
-        raise ValueError("companies_list must contain at least one ticker entry.")
-    return companies
+            tickers.append(str(getattr(item, "ticker", "")).strip().upper())
+    return [t for t in tickers if t]
 
+def get_companies_quotes(companies_list, period: str = "5y") -> pd.DataFrame:
+    """Return historical quotes with a few handy indicators."""
 
-def _flatten_fundamental_dict(
-    fund_dict: dict[str, pd.DataFrame],
-    *,
-    label: str = "ticker",
-) -> pd.DataFrame:
-    frames: List[pd.DataFrame] = []
-    for ticker, frame in fund_dict.items():
-        if frame is None or frame.empty:
+    tickers = _collect_tickers(companies_list)
+    if not tickers:
+        raise ValueError("No tickers provided.")
+
+    frames = []
+    for ticker in tickers:
+        data = yf.Ticker(ticker).history(period=period)
+        if data.empty:
             continue
-        frames.append(
-            frame.T.assign(**{label: ticker}).reset_index().rename(columns={"index": "Date"})
-        )
-    if not frames:
-        return pd.DataFrame(columns=["Date", label])
-    return pd.concat(frames, ignore_index=True)
+        data = data.copy()
+        data["ticker"] = ticker
 
-
-def get_companies_quotes(companies_list: Iterable[dict | Company], period: str = "5y") -> pd.DataFrame:
-    """Fetch historical quotes for a collection of tickers."""
-
-    companies = _ensure_companies(companies_list)
-
-    frames: List[pd.DataFrame] = []
-    for company in companies:
-        ticker_data = yf.Ticker(company.ticker)
-        frame = ticker_data.history(period=period)
-        if frame.empty:
-            continue
-        frame = frame.copy()
-
-        frame["OpenCloseReturn"] = frame["Close"].sub(frame["Open"]).div(frame["Open"]).mul(100)
-        intraday_denominator = frame["Low"].mask(frame["Low"] == 0)
-        frame["IntradayRange"] = frame["High"].sub(frame["Low"]).div(intraday_denominator).mul(100)
-        frame["RSI_14"] = RSIIndicator(close=frame["Close"], window=14).rsi()
-        volume_ma14 = frame["Volume"].rolling(window=14).mean()
-        frame["Volume_vs_MA14"] = frame["Volume"].div(volume_ma14.mask(volume_ma14 == 0))
-
-        frame["ticker"] = company.ticker
-        frames.append(frame)
+        frames.append(data)
 
     if not frames:
-        raise ValueError("No quotes retrieved; check tickers or internet access.")
+        raise ValueError("No quotes retrieved from Yahoo Finance.")
 
-    all_quotes = pd.concat(frames)
-    all_quotes = all_quotes.reset_index()
-    all_quotes["Date"] = pd.to_datetime(all_quotes["Date"]).dt.date
-    return all_quotes
+    out = pd.concat(frames).reset_index()
+    out["Date"] = pd.to_datetime(out["Date"]).dt.date
+    return out
 
+def get_fundamental_data(companies_list):
+    """Return company info and quarterly statements for the tickers."""
 
-def get_fundamental_data(
-    companies_list: Iterable[dict | Company],
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Download company info and quarterly financial statements."""
+    tickers = _collect_tickers(companies_list)
+    if not tickers:
+        raise ValueError("No tickers provided.")
 
-    companies = _ensure_companies(companies_list)
+    info_rows = []
+    income_frames = []
+    balance_frames = []
+    cash_frames = []
 
-    company_info: List[pd.Series] = []
-    quarterly_balance_sheet: dict[str, pd.DataFrame] = {}
-    quarterly_cashflow: dict[str, pd.DataFrame] = {}
-    quarterly_income: dict[str, pd.DataFrame] = {}
-
-    for company in companies:
-        ticker = company.ticker
-        print(f"Data download: {ticker}")
+    for ticker in tickers:
         ticker_data = yf.Ticker(ticker)
 
         info = pd.Series(ticker_data.info)
         info["ticker"] = ticker
-        company_info.append(info)
+        info_rows.append(info)
 
-        quarterly_balance_sheet[ticker] = ticker_data.quarterly_balance_sheet
-        quarterly_cashflow[ticker] = ticker_data.quarterly_cashflow
-        quarterly_income[ticker] = ticker_data.quarterly_income_stmt
+        income = ticker_data.quarterly_income_stmt
+        if income is not None and not income.empty:
+            income = income.T.reset_index().rename(columns={"index": "Date"})
+            income["ticker"] = ticker
+            income_frames.append(income)
 
-    info_df = pd.DataFrame(company_info).reset_index(drop=True)
-    income_df = _flatten_fundamental_dict(quarterly_income)
-    balance_df = _flatten_fundamental_dict(quarterly_balance_sheet)
-    cash_df = _flatten_fundamental_dict(quarterly_cashflow)
+        balance = ticker_data.quarterly_balance_sheet
+        if balance is not None and not balance.empty:
+            balance = balance.T.reset_index().rename(columns={"index": "Date"})
+            balance["ticker"] = ticker
+            balance_frames.append(balance)
+
+        cash = ticker_data.quarterly_cashflow
+        if cash is not None and not cash.empty:
+            cash = cash.T.reset_index().rename(columns={"index": "Date"})
+            cash["ticker"] = ticker
+            cash_frames.append(cash)
+
+    info_df = pd.DataFrame(info_rows).reset_index(drop=True) if info_rows else pd.DataFrame()
+    income_df = pd.concat(income_frames, ignore_index=True) if income_frames else pd.DataFrame(columns=["Date", "ticker"])
+    balance_df = pd.concat(balance_frames, ignore_index=True) if balance_frames else pd.DataFrame(columns=["Date", "ticker"])
+    cash_df = pd.concat(cash_frames, ignore_index=True) if cash_frames else pd.DataFrame(columns=["Date", "ticker"])
 
     return info_df, income_df, balance_df, cash_df

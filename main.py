@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Tuple
+import json
+import shutil
+from datetime import datetime
+from typing import Callable, Dict, List, Tuple
 
+from config import DEFAULT_STOCKS, DEFAULT_TECH_WINDOWS, YAHOO_DATA_DIR
 from feature_scaling.california_housing_demo import run_demo as run_feature_scaling_california_demo
+from core.data_fetch import get_companies_quotes, get_fundamental_data
+from core.data_preparation import prepare_ml_dataset
 
 MenuOption = Tuple[str, Callable[[], None] | None]
 
@@ -17,6 +23,110 @@ def _prompt_menu(title: str, options: Dict[str, MenuOption]) -> str:
         print(f"{key}. {label}")
 
     return input("Choose an option: ").strip()
+
+def _download_yahoo_data() -> None:
+    """Download quotes and fundamentals for selected tickers and store them locally."""
+
+    print("Default ticker universe:")
+    for stock in DEFAULT_STOCKS:
+        print(f" - {stock['ticker']}: {stock['name']}")
+
+    selected = DEFAULT_STOCKS
+
+    if not selected:
+        print("No tickers selected; aborting download.")
+        return
+
+    period = input("Yahoo Finance period (default 5y): ").strip() or "5y"
+    download_quotes = input("Download historical quotes? [Y/n]: ").strip().lower() != 'n'
+    download_fundamentals = input("Download fundamentals? [Y/n]: ").strip().lower() != 'n'
+
+    if not download_quotes and not download_fundamentals:
+        print("Nothing selected to download.")
+        return
+
+    output_dir = YAHOO_DATA_DIR
+    if output_dir.exists():
+        try:
+            shutil.rmtree(output_dir)
+        except OSError as exc:
+            print(f"Failed to clean Yahoo data directory: {exc}")
+            return
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata = {
+        "tickers": [stock.get("ticker", "") for stock in selected],
+        "period": period,
+        "download_quotes": download_quotes,
+        "download_fundamentals": download_fundamentals,
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+
+    quotes_path = None
+    if download_quotes:
+        try:
+            quotes = get_companies_quotes(selected, period=period)
+            quotes_path = output_dir / "quotes.csv"
+            quotes.to_csv(quotes_path, index=False)
+            print(f"Quotes saved to {quotes_path}")
+        except Exception as exc:
+            print(f"Failed to download quotes: {exc}")
+        else:
+            metadata["quotes_path"] = str(quotes_path)
+
+    if download_fundamentals:
+        try:
+            info_df, income_df, balance_df, cash_df = get_fundamental_data(selected)
+            info_path = output_dir / "company_info.csv"
+            income_path = output_dir / "quarterly_income.csv"
+            balance_path = output_dir / "quarterly_balance.csv"
+            cash_path = output_dir / "quarterly_cashflows.csv"
+            info_df.to_csv(info_path, index=False)
+            income_df.to_csv(income_path, index=False)
+            balance_df.to_csv(balance_path, index=False)
+            cash_df.to_csv(cash_path, index=False)
+            print("Fundamentals saved to:")
+            print(f" - {info_path}")
+            print(f" - {income_path}")
+            print(f" - {balance_path}")
+            print(f" - {cash_path}")
+            metadata.update({
+                "info_path": str(info_path),
+                "income_path": str(income_path),
+                "balance_path": str(balance_path),
+                "cash_path": str(cash_path),
+            })
+        except Exception as exc:
+            print(f"Failed to download fundamentals: {exc}")
+
+    metadata_path = output_dir / "metadata.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2))
+    print(f"Metadata saved to {metadata_path}")
+
+
+def _prepare_ml_data() -> None:
+    """Build a machine-learning ready dataset from the current Yahoo snapshot."""
+
+    quotes_path = YAHOO_DATA_DIR / "quotes.csv"
+    if not quotes_path.exists():
+        print("Quotes file not found. Run a download first.")
+        return
+
+    windows = list(DEFAULT_TECH_WINDOWS)
+
+    try:
+        output_path = prepare_ml_dataset(quotes_path, windows=tuple(windows))
+    except Exception as exc:
+        print(f"Failed to prepare dataset: {exc}")
+        return
+
+    print()
+    technicals_path = quotes_path.with_name("technical_indicators.csv")
+    print("Machine learning dataset prepared:")
+    print(f" Source quotes: {quotes_path}")
+    print(f" Technical indicators: {technicals_path}")
+    print(f" Output file: {output_path}")
+    print(f" Windows used: {', '.join(str(w) for w in windows)}")
 
 
 def _feature_scaling_menu() -> None:
@@ -45,7 +155,9 @@ def main() -> None:
     """Main CLI entry point."""
 
     options: Dict[str, MenuOption] = {
-        "1": ("Feature Scaling", _feature_scaling_menu),
+        "1": ("Download Yahoo Finance data", _download_yahoo_data),
+        "2": ("Prepare Yahoo Finance data for ML", _prepare_ml_data),
+        "3": ("Feature Scaling", _feature_scaling_menu),
         "0": ("Exit", None),
     }
 
