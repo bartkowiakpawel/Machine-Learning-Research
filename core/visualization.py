@@ -1,4 +1,4 @@
-﻿"""Common plotting utilities for feature distributions."""
+"""Common plotting utilities for feature distributions."""
 
 from __future__ import annotations
 
@@ -145,9 +145,24 @@ def plot_features_distribution_grid(
         ax_orig.hist(orig_data, bins=50, color="skyblue", edgecolor="black")
         ax_orig.set_title(f"{col} - original", fontsize=9)
 
+        if not orig_data.empty:
+            mean_orig = float(orig_data.mean())
+            median_orig = float(orig_data.median())
+            ax_orig.axvline(mean_orig, color="red", linestyle="--", linewidth=1, label="Mean")
+            ax_orig.axvline(median_orig, color="green", linestyle="-.", linewidth=1, label="Median")
+            ax_orig.legend(loc="upper right", fontsize=7, frameon=False)
+
+
         ax_trans = flat_axes[i * 2 + 1]
         ax_trans.hist(transformed_data, bins=50, color="orange", edgecolor="black")
-        ax_trans.set_title(f"{col} - {title}", fontsize=9)
+        ax_trans.set_title(f"{col} - modified", fontsize=9)
+
+        if not transformed_data.empty:
+            mean_trans = float(transformed_data.mean())
+            median_trans = float(transformed_data.median())
+            ax_trans.axvline(mean_trans, color="red", linestyle="--", linewidth=1, label="Mean")
+            ax_trans.axvline(median_trans, color="green", linestyle="-.", linewidth=1, label="Median")
+            ax_trans.legend(loc="upper right", fontsize=7, frameon=False)
 
     used_slots = len(cols) * 2
     for ax in flat_axes[used_slots:]:

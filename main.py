@@ -1,14 +1,13 @@
-﻿"""Command-line entry point for running project demos."""
+"""Command-line entry point for running project demos."""
 
 from __future__ import annotations
 
 import json
-import shutil
 from datetime import datetime
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, Tuple
 
-from config import DEFAULT_STOCKS, DEFAULT_TECH_WINDOWS, YAHOO_DATA_DIR
-from feature_scaling.california_housing_demo import run_demo as run_feature_scaling_california_demo
+from config import DEFAULT_STOCKS, DEFAULT_TECH_WINDOWS, ML_INPUT_DIR, YAHOO_DATA_DIR
+from feature_scaling import CASE_STUDIES, run_all_cases
 from core.data_fetch import get_companies_quotes, get_fundamental_data
 from core.data_preparation import prepare_ml_dataset
 
@@ -46,12 +45,6 @@ def _download_yahoo_data() -> None:
         return
 
     output_dir = YAHOO_DATA_DIR
-    if output_dir.exists():
-        try:
-            shutil.rmtree(output_dir)
-        except OSError as exc:
-            print(f"Failed to clean Yahoo data directory: {exc}")
-            return
     output_dir.mkdir(parents=True, exist_ok=True)
 
     metadata = {
@@ -114,6 +107,8 @@ def _prepare_ml_data() -> None:
 
     windows = list(DEFAULT_TECH_WINDOWS)
 
+    ML_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+
     try:
         output_path = prepare_ml_dataset(quotes_path, windows=tuple(windows))
     except Exception as exc:
@@ -121,34 +116,46 @@ def _prepare_ml_data() -> None:
         return
 
     print()
-    technicals_path = quotes_path.with_name("technical_indicators.csv")
+    technicals_path = output_path.parent / "technical_indicators.csv"
+    metadata_path = output_path.with_name(f"{output_path.stem}_metadata.json")
     print("Machine learning dataset prepared:")
     print(f" Source quotes: {quotes_path}")
     print(f" Technical indicators: {technicals_path}")
-    print(f" Output file: {output_path}")
+    print(f" ML dataset: {output_path}")
+    print(f" Metadata summary: {metadata_path}")
+    print(f" Output directory: {output_path.parent}")
     print(f" Windows used: {', '.join(str(w) for w in windows)}")
 
 
 def _feature_scaling_menu() -> None:
     """Handle feature scaling sub-menu."""
 
-    options: Dict[str, MenuOption] = {
-        "1": ("California Housing - Yeo-Johnson demo", run_feature_scaling_california_demo),
-        "0": ("Return to main menu", None),
-    }
-
     while True:
-        choice = _prompt_menu("Feature Scaling - available demos:", options)
+        print("\nFeature Scaling - available case studies:")
+        print("1. Run all case studies")
+        for idx, case in enumerate(CASE_STUDIES, start=2):
+            print(f"{idx}. {case.case_id} - {case.title}")
+        print("0. Return to main menu")
+
+        choice = input("Choose an option: ").strip()
 
         if choice == "0":
             return
+        if choice == "1":
+            run_all_cases()
+            continue
 
-        action = options.get(choice, ("", None))[1]
-        if action is None:
+        try:
+            numeric_choice = int(choice)
+        except ValueError:
             print("Invalid choice, please try again.")
             continue
 
-        action()
+        case_index = numeric_choice - 2
+        if 0 <= case_index < len(CASE_STUDIES):
+            CASE_STUDIES[case_index].runner()
+        else:
+            print("Invalid choice, please try again.")
 
 
 def main() -> None:

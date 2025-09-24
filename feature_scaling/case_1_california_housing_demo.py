@@ -1,8 +1,14 @@
-﻿"""Demonstration of feature scaling on the California Housing dataset."""
+"""Case study 1: feature scaling on the California Housing dataset."""
 
 from __future__ import annotations
 
 from pathlib import Path
+if __package__ in (None, ""):
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.append(str(_Path(__file__).resolve().parents[1]))
+
 from typing import Callable, Iterable
 
 import joblib
@@ -16,7 +22,9 @@ from sklearn.preprocessing import PowerTransformer
 
 from core.visualization import plot_features_distribution_grid
 
-_OUTPUT_DIR = Path("feature_scaling") / "outputs"
+CASE_ID = "case_1"
+CASE_NAME = "California Housing - Yeo-Johnson scaling"
+DEFAULT_OUTPUT_ROOT = Path("feature_scaling") / "outputs"
 _MODEL_FILENAME = "linear_regression_california.joblib"
 
 
@@ -70,15 +78,24 @@ def _sample_train_test(
     return x_train, y_train, x_test, y_test
 
 
+def _resolve_output_dir(output_root: Path | str | None) -> Path:
+    root = Path(output_root) if output_root is not None else DEFAULT_OUTPUT_ROOT
+    case_dir = root / CASE_ID
+    case_dir.mkdir(parents=True, exist_ok=True)
+    return case_dir
+
+
 def _save_prediction_bar_chart(
     y_true: Iterable[float],
     y_pred: Iterable[float],
     title: str,
     filename_suffix: str,
+    *,
+    output_dir: Path,
 ) -> Path:
     """Create a bar chart comparing predictions with targets and save to PNG."""
 
-    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     y_true_array = np.asarray(list(y_true))
     y_pred_array = np.asarray(list(y_pred))
@@ -110,7 +127,7 @@ def _save_prediction_bar_chart(
         )
 
     filename = f"california_housing_predictions_{filename_suffix}.png"
-    plot_path = _OUTPUT_DIR / filename
+    plot_path = output_dir / filename
     fig.savefig(plot_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     return plot_path
@@ -122,6 +139,7 @@ def _train_and_evaluate(
     *,
     title: str,
     filename_suffix: str,
+    output_dir: Path,
     sample_size: int = 10,
     random_seed: int | None = None,
 ) -> None:
@@ -137,8 +155,8 @@ def _train_and_evaluate(
     model = LinearRegression()
     model.fit(x_train, y_train)
 
-    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = _OUTPUT_DIR / _MODEL_FILENAME
+    output_dir.mkdir(parents=True, exist_ok=True)
+    model_path = output_dir / _MODEL_FILENAME
     joblib.dump(model, model_path)
 
     del model
@@ -177,12 +195,22 @@ def _train_and_evaluate(
         y_pred,
         title="Prediction vs actual values for 10 random unseen records",
         filename_suffix=filename_suffix,
+        output_dir=output_dir,
     )
     print(f"Prediction comparison chart saved to: {plot_path}\n")
 
 
-def run_demo(n_features_per_row: int = 3) -> None:
-    """Fetch the California Housing dataset and visualise Yeo-Johnson scaling."""
+def run_case(
+    n_features_per_row: int = 3,
+    *,
+    output_root: Path | str | None = None,
+) -> Path:
+    """Execute Case 1 and return the directory where outputs were stored."""
+
+    case_output_dir = _resolve_output_dir(output_root)
+
+    print(f"\n=== Running {CASE_ID}: {CASE_NAME} ===")
+    print(f"Outputs will be stored in: {case_output_dir}")
 
     data = fetch_california_housing(as_frame=True)
     original_frame = data.frame
@@ -206,6 +234,7 @@ def run_demo(n_features_per_row: int = 3) -> None:
         features,
         title="Yeo-Johnson applied for California Housing set",
         n_features_per_row=n_features_per_row,
+        output_dir=case_output_dir,
     )
     print(f"Feature distribution chart saved to: {plot_path}")
 
@@ -214,6 +243,7 @@ def run_demo(n_features_per_row: int = 3) -> None:
         target,
         title="not transformed data",
         filename_suffix="original",
+        output_dir=case_output_dir,
     )
 
     transformed_with_target = transformed_frame.copy()
@@ -224,8 +254,12 @@ def run_demo(n_features_per_row: int = 3) -> None:
         transformed_with_target["MedHouseVal"],
         title="transformed data with Yeo-Johnson",
         filename_suffix="yeo_johnson",
+        output_dir=case_output_dir,
     )
+
+    return case_output_dir
 
 
 if __name__ == "__main__":
-    run_demo()
+    run_case()
+
