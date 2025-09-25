@@ -1,4 +1,4 @@
-"""Feature scaling case studies registry."""
+﻿"""Feature scaling case studies registry."""
 
 from __future__ import annotations
 
@@ -15,6 +15,10 @@ from .case_2_ml_dataset_tsla import run_case as run_case_2
 from .case_3_hybrid_tsla import CASE_ID as CASE_3_ID
 from .case_3_hybrid_tsla import CASE_NAME as CASE_3_NAME
 from .case_3_hybrid_tsla import run_case as run_case_3
+from .case_4_technical_tsla import CASE_ID as CASE_4_ID
+from .case_4_technical_tsla import CASE_NAME as CASE_4_NAME
+from .case_4_technical_tsla import run_case as run_case_4
+from .settings import FEATURE_SCALING_CASES
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,7 @@ CASE_STUDIES: Tuple[CaseStudy, ...] = (
     CaseStudy(CASE_1_ID, CASE_1_NAME, run_case_1),
     CaseStudy(CASE_2_ID, CASE_2_NAME, run_case_2),
     CaseStudy(CASE_3_ID, CASE_3_NAME, run_case_3),
+    CaseStudy(CASE_4_ID, CASE_4_NAME, run_case_4),
 )
 
 
@@ -49,4 +54,5 @@ def run_all_cases() -> None:
         case.runner()
 
 
-__all__ = ["CaseStudy", "CASE_STUDIES", "get_case_studies", "run_all_cases"]
+__all__ = ["CaseStudy", "CASE_STUDIES", "FEATURE_SCALING_CASES", "get_case_studies", "run_all_cases"]
+

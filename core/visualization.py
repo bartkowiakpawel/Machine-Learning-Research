@@ -28,6 +28,18 @@ def _sanitize_filename(title: str, suffix: str) -> str:
         return f"{base}_{suffix}.png"
     return f"{base}.png"
 
+def _extract_numeric_values(df: pd.DataFrame, column: str) -> np.ndarray:
+    values = df.loc[:, column]
+    if isinstance(values, pd.DataFrame):
+        arr = values.to_numpy().ravel()
+    else:
+        arr = values.to_numpy()
+    if arr.ndim == 2:
+        arr = arr.ravel()
+    arr = arr.astype(float, copy=False)
+    return arr[~np.isnan(arr)]
+
+
 
 def _save_figure(fig: plt.Figure, output_dir: Path | str | None, filename: str) -> Path:
     directory = Path(output_dir) if output_dir is not None else _DEFAULT_OUTPUT_DIR
@@ -76,13 +88,13 @@ def features_values_distribution(
     axes = np.atleast_2d(axes)
 
     for i, col in enumerate(cols):
-        orig_data = original_features[col].dropna()
-        transformed_data = df[col].dropna()
+        orig_values = _extract_numeric_values(original_features, col)
+        transformed_values = _extract_numeric_values(df, col)
 
-        axes[i, 0].hist(orig_data, bins=50, color="skyblue", edgecolor="black")
+        axes[i, 0].hist(orig_values, bins=50, color="skyblue", edgecolor="black")
         axes[i, 0].set_title(f"{col} - original data")
 
-        axes[i, 1].hist(transformed_data, bins=50, color="orange", edgecolor="black")
+        axes[i, 1].hist(transformed_values, bins=50, color="orange", edgecolor="black")
         axes[i, 1].set_title(f"{col} - {title}")
 
     fig.tight_layout()
@@ -138,28 +150,28 @@ def plot_features_distribution_grid(
     flat_axes = np.array(axes).reshape(-1)
 
     for i, col in enumerate(cols):
-        orig_data = original_features[col].dropna()
-        transformed_data = df[col].dropna()
+        orig_values = _extract_numeric_values(original_features, col)
+        transformed_values = _extract_numeric_values(df, col)
 
         ax_orig = flat_axes[i * 2]
-        ax_orig.hist(orig_data, bins=50, color="skyblue", edgecolor="black")
+        ax_orig.hist(orig_values, bins=50, color="skyblue", edgecolor="black")
         ax_orig.set_title(f"{col} - original", fontsize=9)
 
-        if not orig_data.empty:
-            mean_orig = float(orig_data.mean())
-            median_orig = float(orig_data.median())
+        if orig_values.size > 0:
+            mean_orig = float(np.nanmean(orig_values))
+            median_orig = float(np.nanmedian(orig_values))
             ax_orig.axvline(mean_orig, color="red", linestyle="--", linewidth=1, label="Mean")
             ax_orig.axvline(median_orig, color="green", linestyle="-.", linewidth=1, label="Median")
             ax_orig.legend(loc="upper right", fontsize=7, frameon=False)
 
 
         ax_trans = flat_axes[i * 2 + 1]
-        ax_trans.hist(transformed_data, bins=50, color="orange", edgecolor="black")
+        ax_trans.hist(transformed_values, bins=50, color="orange", edgecolor="black")
         ax_trans.set_title(f"{col} - modified", fontsize=9)
 
-        if not transformed_data.empty:
-            mean_trans = float(transformed_data.mean())
-            median_trans = float(transformed_data.median())
+        if transformed_values.size > 0:
+            mean_trans = float(np.nanmean(transformed_values))
+            median_trans = float(np.nanmedian(transformed_values))
             ax_trans.axvline(mean_trans, color="red", linestyle="--", linewidth=1, label="Mean")
             ax_trans.axvline(median_trans, color="green", linestyle="-.", linewidth=1, label="Median")
             ax_trans.legend(loc="upper right", fontsize=7, frameon=False)

@@ -1,4 +1,4 @@
-"""Case study 2: inspect ML dataset for TSLA."""
+﻿"""Case study 2: inspect ML dataset for TSLA."""
 
 from __future__ import annotations
 
@@ -10,13 +10,22 @@ if __package__ in (None, ""):
 
     sys.path.append(str(_Path(__file__).resolve().parents[1]))
 
-import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer
 
-from config import FEATURE_SCALING_CASES, ML_INPUT_DIR, MODEL_DICT
-from core.model_evaluation import plot_learning_curves_for_models
+from config import ML_INPUT_DIR, MODEL_DICT
+from core.prediction_validation import evaluate_last_n_day_predictions
 from core.visualization import plot_features_distribution_grid
+from feature_scaling._shared import (
+    clean_feature_matrix,
+    filter_ticker,
+    load_ml_dataset,
+    prepare_feature_matrix,
+    resolve_output_dir,
+    run_learning_workflow,
+    save_dataframe,
+)
+from feature_scaling.settings import FEATURE_SCALING_CASES
 
 CASE_ID = "case_2"
 CASE_NAME = "TSLA with tech and funds indicator"
@@ -25,100 +34,65 @@ CASE_CONFIG = FEATURE_SCALING_CASES.get(CASE_ID, {})
 CASE_FEATURES = list(CASE_CONFIG.get("features", []))
 CASE_TARGET = CASE_CONFIG.get("target")
 CASE_TARGET_SOURCE = CASE_CONFIG.get("target_source", CASE_TARGET)
-CSV_KWARGS = {"index": False, "sep": ",", "decimal": "."}
+
+LAST_N_DAYS = 5
 
 
-def _resolve_output_dir(output_root: Path | str | None) -> Path:
-    root = Path(output_root) if output_root is not None else DEFAULT_OUTPUT_ROOT
-    case_dir = root / CASE_ID
-    case_dir.mkdir(parents=True, exist_ok=True)
-    return case_dir
-
-
-def _load_ml_dataset(dataset_path: Path) -> pd.DataFrame:
-    if not dataset_path.exists():
-        raise FileNotFoundError(
-            f"ML dataset not found at {dataset_path}. Run the ML preparation pipeline first."
-        )
-
-    df = pd.read_csv(dataset_path)
-    if "ticker" not in df.columns:
-        raise KeyError("ML dataset must contain a 'ticker' column")
-
-    return df
-
-
-def _filter_ticker(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
-    ticker_upper = ticker.upper()
-    result = df[df["ticker"].astype(str).str.upper() == ticker_upper].copy()
-    return result
-
-
-def _prepare_feature_matrix(
-    df: pd.DataFrame,
-    feature_columns: list[str],
-    target_column: str | None,
-    target_source: str | None,
-) -> pd.DataFrame:
-    if not feature_columns:
-        raise ValueError("Feature list for the case study is empty.")
-
-    missing_features = [col for col in feature_columns if col not in df.columns]
-    if missing_features:
-        missing_fmt = ", ".join(missing_features)
-        raise KeyError(f"Missing feature columns in dataset: {missing_fmt}")
-
-    working = df.copy()
-
-    if target_column:
-        if target_column not in working.columns:
-            if target_source and target_source in working.columns:
-                working[target_column] = working[target_source]
-            else:
-                raise KeyError(
-                    "Target column not found and no fallback target_source available in dataset."
-                )
-        selected_columns = feature_columns + [target_column]
-    else:
-        selected_columns = feature_columns
-
-    return working.loc[:, selected_columns]
-
-
-def _clean_feature_matrix(df: pd.DataFrame) -> pd.DataFrame:
-    """Replace infinities and drop rows containing NaNs."""
-
-    if df.empty:
-        return df
-
-    sanitized = df.replace([np.inf, -np.inf], np.nan)
-    return sanitized.dropna()
-
-
-def _save_dataframe(df: pd.DataFrame, output_dir: Path, filename: str) -> Path:
-    output_path = output_dir / filename
-    df.to_csv(output_path, **CSV_KWARGS)
-    return output_path
-
-
-def _run_learning_workflow(
-    X: pd.DataFrame,
-    y: pd.Series,
+def _run_last_n_validation(
+    X_features: pd.DataFrame,
+    y_target: pd.Series,
     *,
-    title_suffix: str,
+    metadata: pd.DataFrame | None,
+    dataset_label: str,
     output_dir: Path,
-    show_plots: bool,
-) -> tuple[pd.DataFrame, Path | None, Path | None]:
-    return plot_learning_curves_for_models(
-        MODEL_DICT,
-        X,
-        y,
-        main_title=f"Learning curves for {title_suffix}",
-        output_dir=output_dir,
-        show=show_plots,
-        feature_distribution=None,
-        original_feature_distribution=None,
+    plot_prefix: str,
+    model_store_dir: Path,
+    preprocessor=None,
+) -> None:
+    if metadata is None:
+        return
+
+    try:
+        result = evaluate_last_n_day_predictions(
+            MODEL_DICT,
+            X_features,
+            y_target,
+            metadata=metadata,
+            dataset_label=dataset_label,
+            n_days=LAST_N_DAYS,
+            ticker_column="ticker",
+            date_column="Date",
+            output_dir=output_dir,
+            plot_prefix=plot_prefix,
+            n_plot_columns=3,
+            show_plot=False,
+            preprocessor=preprocessor,
+            model_store_dir=model_store_dir,
+        )
+    except ValueError as exc:
+        print(f"Skipping last-{LAST_N_DAYS}-day validation for {dataset_label}: {exc}")
+        return
+
+    global_path = save_dataframe(
+        result.model_metrics,
+        output_dir,
+        f"{plot_prefix}_last_{LAST_N_DAYS}_day_metrics.csv",
     )
+    print(f"{dataset_label} last-{LAST_N_DAYS}-day global metrics saved to: {global_path}")
+
+    ticker_path = save_dataframe(
+        result.per_ticker_metrics,
+        output_dir,
+        f"{plot_prefix}_last_{LAST_N_DAYS}_day_metrics_by_ticker.csv",
+    )
+    print(f"{dataset_label} last-{LAST_N_DAYS}-day per-ticker metrics saved to: {ticker_path}")
+
+    predictions_path = save_dataframe(
+        result.predictions,
+        output_dir,
+        f"{plot_prefix}_last_{LAST_N_DAYS}_day_predictions.csv",
+    )
+    print(f"{dataset_label} last-{LAST_N_DAYS}-day predictions saved to: {predictions_path}")
 
 
 def run_case(
@@ -130,19 +104,21 @@ def run_case(
 ) -> Path:
     """Fetch the ML dataset, filter by ticker, and persist the snapshot."""
 
-    case_output_dir = _resolve_output_dir(output_root)
+    case_output_dir = resolve_output_dir(CASE_ID, DEFAULT_OUTPUT_ROOT, output_root)
+    last_n_output_dir = case_output_dir / "last_n_day_validation"
+    model_store_dir = case_output_dir / "models"
 
     dataset_path = ML_INPUT_DIR / dataset_filename
-    print(f"\n=== Running {CASE_ID}: {CASE_NAME} ===")
+    print(f"=== Running {CASE_ID}: {CASE_NAME} ===")
     print(f"Expecting ML dataset at: {dataset_path}")
 
-    data = _load_ml_dataset(dataset_path)
+    data = load_ml_dataset(dataset_path)
     print(f"Loaded dataset with shape: {data.shape}")
 
-    subset = _filter_ticker(data, ticker)
+    subset = filter_ticker(data, ticker)
     print(f"Rows for ticker '{ticker}': {len(subset)}")
 
-    snapshot_path = _save_dataframe(subset, case_output_dir, f"{ticker.lower()}_rows.csv")
+    snapshot_path = save_dataframe(subset, case_output_dir, f"{ticker.lower()}_rows.csv")
     print(f"Filtered rows saved to: {snapshot_path}")
 
     if subset.empty:
@@ -154,9 +130,9 @@ def run_case(
     if CASE_TARGET is None:
         raise ValueError("CASE_TARGET configuration is missing for case_2.")
 
-    feature_matrix = _prepare_feature_matrix(subset, CASE_FEATURES, CASE_TARGET, CASE_TARGET_SOURCE)
+    feature_matrix = prepare_feature_matrix(subset, CASE_FEATURES, CASE_TARGET, CASE_TARGET_SOURCE)
     rows_before = len(feature_matrix)
-    feature_matrix = _clean_feature_matrix(feature_matrix)
+    feature_matrix = clean_feature_matrix(feature_matrix)
     rows_after = len(feature_matrix)
     dropped = rows_before - rows_after
     if dropped > 0:
@@ -166,14 +142,20 @@ def run_case(
         print("Feature matrix empty after cleaning; skipping file export.")
         return case_output_dir
 
-    raw_matrix_path = _save_dataframe(
+    metadata_for_validation = None
+    if {"Date", "ticker"}.issubset(subset.columns):
+        metadata_for_validation = subset.loc[feature_matrix.index, ["Date", "ticker"]].copy()
+    else:
+        print("Skipping last-N-day validation because required 'Date' or 'ticker' columns are missing.")
+
+    raw_matrix_path = save_dataframe(
         feature_matrix,
         case_output_dir,
         f"{ticker.lower()}_feature_matrix.csv",
     )
     print(f"Feature subset saved to: {raw_matrix_path}")
 
-    raw_summary_path = _save_dataframe(
+    raw_summary_path = save_dataframe(
         feature_matrix.describe(include="all").transpose(),
         case_output_dir,
         f"{ticker.lower()}_feature_matrix_summary.csv",
@@ -183,8 +165,9 @@ def run_case(
     X_raw = feature_matrix[CASE_FEATURES]
     y_raw = feature_matrix[CASE_TARGET]
 
-    print("\n--- Learning curves on raw features ---")
-    raw_results, raw_curve_path, _ = _run_learning_workflow(
+    print("--- Learning curves on raw features ---")
+    raw_results, raw_curve_path, _ = run_learning_workflow(
+        MODEL_DICT,
         X_raw,
         y_raw,
         title_suffix=f"{ticker} (raw)",
@@ -192,7 +175,7 @@ def run_case(
         show_plots=show_plots,
     )
 
-    raw_results_path = _save_dataframe(
+    raw_results_path = save_dataframe(
         raw_results,
         case_output_dir,
         f"{ticker.lower()}_learning_curve_raw.csv",
@@ -201,32 +184,42 @@ def run_case(
     if raw_curve_path:
         print(f"Raw learning curve figure saved to: {raw_curve_path}")
 
+    if metadata_for_validation is not None:
+        _run_last_n_validation(
+            X_raw,
+            y_raw,
+            metadata=metadata_for_validation,
+            dataset_label=f"{ticker} raw",
+            output_dir=last_n_output_dir,
+            plot_prefix=f"{ticker.lower()}_raw",
+            model_store_dir=model_store_dir,
+        )
 
-
-    print("\n--- Applying Yeo-Johnson transformation ---")
-    transformer = PowerTransformer(method="yeo-johnson")
-    X_transformed_array = transformer.fit_transform(X_raw)
-    X_transformed = pd.DataFrame(X_transformed_array, columns=CASE_FEATURES, index=X_raw.index)
+    print("--- Applying Yeo-Johnson transformation ---")
+    analysis_transformer = PowerTransformer(method="yeo-johnson")
+    X_transformed_array = analysis_transformer.fit_transform(X_raw)
+    X_transformed = pd.DataFrame(X_transformed_array, columns=X_raw.columns, index=X_raw.index)
 
     transformed_matrix = X_transformed.copy()
     transformed_matrix[CASE_TARGET] = y_raw.values
 
-    transformed_matrix_path = _save_dataframe(
+    transformed_matrix_path = save_dataframe(
         transformed_matrix,
         case_output_dir,
         f"{ticker.lower()}_feature_matrix_yeojohnson.csv",
     )
     print(f"Transformed feature subset saved to: {transformed_matrix_path}")
 
-    transformed_summary_path = _save_dataframe(
+    transformed_summary_path = save_dataframe(
         transformed_matrix.describe(include="all").transpose(),
         case_output_dir,
         f"{ticker.lower()}_feature_matrix_yeojohnson_summary.csv",
     )
     print(f"Transformed feature summary saved to: {transformed_summary_path}")
 
-    print("\n--- Learning curves on Yeo-Johnson transformed features ---")
-    transformed_results, transformed_curve_path, _ = _run_learning_workflow(
+    print("--- Learning curves on Yeo-Johnson transformed features ---")
+    transformed_results, transformed_curve_path, _ = run_learning_workflow(
+        MODEL_DICT,
         X_transformed,
         y_raw,
         title_suffix=f"{ticker} (Yeo-Johnson)",
@@ -234,7 +227,7 @@ def run_case(
         show_plots=show_plots,
     )
 
-    transformed_results_path = _save_dataframe(
+    transformed_results_path = save_dataframe(
         transformed_results,
         case_output_dir,
         f"{ticker.lower()}_learning_curve_yeojohnson.csv",
@@ -242,6 +235,19 @@ def run_case(
     print(f"Transformed learning curve diagnostics saved to: {transformed_results_path}")
     if transformed_curve_path:
         print(f"Transformed learning curve figure saved to: {transformed_curve_path}")
+
+    if metadata_for_validation is not None:
+        yeo_transformer = PowerTransformer(method="yeo-johnson")
+        _run_last_n_validation(
+            X_raw,
+            y_raw,
+            metadata=metadata_for_validation,
+            dataset_label=f"{ticker} Yeo-Johnson",
+            output_dir=last_n_output_dir,
+            plot_prefix=f"{ticker.lower()}_yeojohnson",
+            model_store_dir=model_store_dir,
+            preprocessor=yeo_transformer,
+        )
 
     transformed_distribution_path = plot_features_distribution_grid(
         X_transformed,
@@ -258,7 +264,7 @@ def run_case(
         ],
         ignore_index=True,
     )
-    comparison_path = _save_dataframe(
+    comparison_path = save_dataframe(
         comparison_results,
         case_output_dir,
         f"{ticker.lower()}_learning_curve_comparison.csv",
@@ -270,9 +276,3 @@ def run_case(
 
 if __name__ == "__main__":
     run_case(show_plots=True)
-
-
-
-
-
-
