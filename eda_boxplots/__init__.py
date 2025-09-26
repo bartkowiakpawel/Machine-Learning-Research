@@ -8,13 +8,20 @@ from typing import Callable, Tuple
 
 from .case_1_multi_ticker_boxplots import run_case as run_case_1
 from .case_2_yeojohnson_boxplots import run_case as run_case_2
+from .case_3_target_features_boxplots import run_case as run_case_3
+from .case_4_hybrid_boxplots import run_case as run_case_4
+from .case_5_technical_boxplots import run_case as run_case_5
+from .case_6_hybrid_1d_boxplots import run_case as run_case_6
+from .case_7_extended_hybrid_boxplots import run_case as run_case_7
 from .settings import (
     AVAILABLE_CASE_IDS,
     DEFAULT_DATASET_FILENAME,
     DEFAULT_FEATURES,
     DEFAULT_OUTPUT_ROOT,
+    DEFAULT_TARGET_FEATURES,
     DEFAULT_TICKER,
     DEFAULT_TICKERS,
+    EXTENDED_TECH_FEATURES,
     CaseConfig,
     get_case_config,
 )
@@ -32,6 +39,11 @@ class CaseStudy:
 CASE_STUDIES: Tuple[CaseStudy, ...] = (
     CaseStudy(case_id="case_1", title=get_case_config("case_1").name, runner=run_case_1),
     CaseStudy(case_id="case_2", title=get_case_config("case_2").name, runner=run_case_2),
+    CaseStudy(case_id="case_3", title=get_case_config("case_3").name, runner=run_case_3),
+    CaseStudy(case_id="case_4", title=get_case_config("case_4").name, runner=run_case_4),
+    CaseStudy(case_id="case_5", title=get_case_config("case_5").name, runner=run_case_5),
+    CaseStudy(case_id="case_6", title=get_case_config("case_6").name, runner=run_case_6),
+    CaseStudy(case_id="case_7", title=get_case_config("case_7").name, runner=run_case_7),
 )
 
 _CASE_RUNNERS = {case.case_id: case.runner for case in CASE_STUDIES}
@@ -61,6 +73,8 @@ __all__ = [
     "DEFAULT_TICKERS",
     "DEFAULT_DATASET_FILENAME",
     "DEFAULT_FEATURES",
+    "DEFAULT_TARGET_FEATURES",
+    "EXTENDED_TECH_FEATURES",
     "DEFAULT_OUTPUT_ROOT",
     "CaseConfig",
     "get_case_config",
