@@ -1,25 +1,69 @@
-"""EDA & Boxplots package entry points."""
+"""EDA & Boxplots case registry."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable, Tuple
 
-from .case_1_boxplots import run_case
+from .case_1_multi_ticker_boxplots import run_case as run_case_1
+from .case_2_yeojohnson_boxplots import run_case as run_case_2
 from .settings import (
-    CASE_ID,
-    CASE_NAME,
+    AVAILABLE_CASE_IDS,
     DEFAULT_DATASET_FILENAME,
     DEFAULT_FEATURES,
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_TICKER,
+    DEFAULT_TICKERS,
+    CaseConfig,
+    get_case_config,
 )
 
+
+@dataclass(frozen=True)
+class CaseStudy:
+    """Descriptor for an EDA boxplot case study."""
+
+    case_id: str
+    title: str
+    runner: Callable[..., Path]
+
+
+CASE_STUDIES: Tuple[CaseStudy, ...] = (
+    CaseStudy(case_id="case_1", title=get_case_config("case_1").name, runner=run_case_1),
+    CaseStudy(case_id="case_2", title=get_case_config("case_2").name, runner=run_case_2),
+)
+
+_CASE_RUNNERS = {case.case_id: case.runner for case in CASE_STUDIES}
+
+
+def get_case_studies() -> Tuple[CaseStudy, ...]:
+    """Return the registered EDA boxplot case studies."""
+
+    return CASE_STUDIES
+
+
+def run_case_by_id(case_id: str, **kwargs):
+    """Execute a case study by its identifier."""
+
+    try:
+        runner = _CASE_RUNNERS[case_id]
+    except KeyError as exc:
+        raise KeyError(f"Unknown EDA boxplots case id: {case_id}") from exc
+    return runner(**kwargs)
+
+
 __all__ = [
-    "CASE_ID",
-    "CASE_NAME",
+    "CaseStudy",
+    "CASE_STUDIES",
+    "AVAILABLE_CASE_IDS",
     "DEFAULT_TICKER",
+    "DEFAULT_TICKERS",
     "DEFAULT_DATASET_FILENAME",
     "DEFAULT_FEATURES",
     "DEFAULT_OUTPUT_ROOT",
-    "run_case",
+    "CaseConfig",
+    "get_case_config",
+    "get_case_studies",
+    "run_case_by_id",
 ]

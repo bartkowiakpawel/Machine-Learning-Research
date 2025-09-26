@@ -1,0 +1,52 @@
+1. Masz surowe dane – dzienne stopy zwrotu
+
+Przykład (procenty):
+
+TSLA: [+3, -2, +20, -12, +1, +5]
+
+AAPL: [+1, 0, +2, -1, +1, +1.5]
+
+MSFT: [+0.5, -0.2, +1, -0.5, +0.7, +0.8]
+
+2. Boxplot dla tych danych
+
+TSLA → duży rozrzut, mnóstwo outlierów (np. +20, -12).
+
+AAPL → rozrzut umiarkowany, kilka odstających.
+
+MSFT → pudełko bardzo wąskie, brak poważnych outlierów.
+
+3. Wyciągasz liczby z boxplota (feature engineering)
+
+Zamiast patrzeć na wykres, liczysz wskaźniki:
+
+IQR (rozstęp międzykwartylowy) – mówi, jak szerokie jest pudełko (czyli typowa zmienność).
+
+Outlier ratio – ile % punktów wykracza poza wąsy.
+
+Mediana – typowy zwrot w danym okresie.
+
+Przykład:
+
+TSLA: IQR = 10, outlier_ratio = 30%
+
+AAPL: IQR = 2, outlier_ratio = 10%
+
+MSFT: IQR = 1, outlier_ratio = 0%
+
+4. Tworzysz tabelę (features dla ML)
+Ticker	IQR	Outlier_ratio	Median
+TSLA	10	0.30	+1%
+AAPL	2	0.10	+1%
+MSFT	1	0.00	+0.7%
+5. Jak to użyć w ML?
+
+Dodajesz te kolumny jako cechy wejściowe do swojego modelu.
+
+Model uczy się, że spółki o dużym IQR i wysokim outlier_ratio (TSLA) mają większe ryzyko i większą zmienność zwrotów.
+
+Może to być użyte do klasyfikacji:
+
+“Stabilna / Umiarkowana / Loteria”
+
+albo do regresji → przewidujesz przyszłą zmienność / oczekiwany zwrot.

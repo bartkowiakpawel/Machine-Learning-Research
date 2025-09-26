@@ -10,10 +10,9 @@ from config import DEFAULT_STOCKS, DEFAULT_TECH_WINDOWS, ML_INPUT_DIR, YAHOO_DAT
 from core.data_fetch import get_companies_quotes, get_fundamental_data
 from core.data_preparation import prepare_ml_dataset
 from eda_boxplots import (
-    CASE_NAME as EDA_CASE_NAME,
+    CASE_STUDIES as EDA_CASE_STUDIES,
     DEFAULT_DATASET_FILENAME as EDA_DEFAULT_DATASET,
-    DEFAULT_TICKER as EDA_DEFAULT_TICKER,
-    run_case as run_eda_boxplots,
+    DEFAULT_TICKERS as EDA_DEFAULT_TICKERS,
 )
 from feature_scaling import CASE_STUDIES, run_all_cases
 
@@ -165,25 +164,65 @@ def _feature_scaling_menu() -> None:
             print("Invalid choice, please try again.")
 
 
-def _run_eda_boxplots() -> None:
-    """Execute the EDA boxplots workflow with basic prompts."""
+def _prompt_eda_inputs() -> tuple[str, list[str], bool]:
+    """Collect common CLI inputs for EDA boxplot cases."""
 
-    print(f"\n{EDA_CASE_NAME}")
-    ticker = input(f"Ticker symbol (default {EDA_DEFAULT_TICKER}): ").strip() or EDA_DEFAULT_TICKER
     dataset_filename = (
         input(
             f"Dataset filename in ML input directory (default {EDA_DEFAULT_DATASET}): "
         ).strip()
         or EDA_DEFAULT_DATASET
     )
-    show_choice = input("Display plots interactively? [y/N]: ").strip().lower()
-    show_plots = show_choice == "y"
+    tickers_input = input(
+        f"Tickers to include (comma-separated, default {', '.join(EDA_DEFAULT_TICKERS)}): "
+    ).strip()
+    tickers: list[str] = []
+    if tickers_input:
+        for token in tickers_input.split(','):
+            ticker = token.strip().upper()
+            if ticker and ticker not in tickers:
+                tickers.append(ticker)
+    else:
+        tickers = list(EDA_DEFAULT_TICKERS)
 
-    run_eda_boxplots(
-        ticker=ticker,
-        dataset_filename=dataset_filename,
-        show_plots=show_plots,
-    )
+    show_choice = input("Display plots interactively? [y/N]: ").strip().lower()
+    show_plots = show_choice == 'y'
+
+    return dataset_filename, tickers, show_plots
+
+
+def _run_eda_boxplots() -> None:
+    """Interactive menu for EDA boxplot case studies."""
+
+    while True:
+        print("\nEDA & Boxplots - available case studies:")
+        for idx, case in enumerate(EDA_CASE_STUDIES, start=1):
+            print(f"{idx}. {case.case_id} - {case.title}")
+        print("0. Return to main menu")
+
+        choice = input("Choose an option: ").strip()
+
+        if choice == "0":
+            return
+
+        try:
+            numeric_choice = int(choice)
+        except ValueError:
+            print("Invalid choice, please try again.")
+            continue
+
+        case_index = numeric_choice - 1
+        if not (0 <= case_index < len(EDA_CASE_STUDIES)):
+            print("Invalid choice, please try again.")
+            continue
+
+        dataset_filename, tickers, show_plots = _prompt_eda_inputs()
+        selected_case = EDA_CASE_STUDIES[case_index]
+        selected_case.runner(
+            tickers=tickers,
+            dataset_filename=dataset_filename,
+            show_plots=show_plots,
+        )
 
 
 def main() -> None:
