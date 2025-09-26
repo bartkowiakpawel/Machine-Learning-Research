@@ -1,4 +1,4 @@
-﻿"""Configuration values specific to the feature_scaling package."""
+"""Configuration values specific to the feature_scaling package."""
 
 from __future__ import annotations
 
@@ -70,6 +70,28 @@ FEATURE_SCALING_CASES: Mapping[str, dict] = {
         ],
         "target": "target_Close+14_pct",
         "target_source": "target_pct_14",
+    },
+    "case_6": {
+        "features": [
+            "OpenCloseReturn",
+            "IntradayRange",
+            "rsi_14",
+            "Volume_vs_MA14",
+        ],
+        "target": "target_Close+14_pct",
+        "target_source": "target_pct_14",
+        "polynomial_degree": 2,
+    },
+    "case_7": {
+        "features": [
+            "OpenCloseReturn",
+            "IntradayRange",
+            "rsi_14",
+            "Volume_vs_MA14",
+        ],
+        "target": "target_Close+14_pct",
+        "target_source": "target_pct_14",
+        "polynomial_degree": 2,
     },
 }
 

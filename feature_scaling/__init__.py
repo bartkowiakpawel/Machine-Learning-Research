@@ -1,4 +1,4 @@
-﻿"""Feature scaling case studies registry."""
+"""Feature scaling case studies registry."""
 
 from __future__ import annotations
 
@@ -18,6 +18,15 @@ from .case_3_hybrid_tsla import run_case as run_case_3
 from .case_4_technical_tsla import CASE_ID as CASE_4_ID
 from .case_4_technical_tsla import CASE_NAME as CASE_4_NAME
 from .case_4_technical_tsla import run_case as run_case_4
+from .case_5_technical_multi import CASE_ID as CASE_5_ID
+from .case_5_technical_multi import CASE_NAME as CASE_5_NAME
+from .case_5_technical_multi import run_case as run_case_5
+from .case_6_polynomial_tsla import CASE_ID as CASE_6_ID
+from .case_6_polynomial_tsla import CASE_NAME as CASE_6_NAME
+from .case_6_polynomial_tsla import run_case as run_case_6
+from .case_7_polynomial_yeojohnson_tsla import CASE_ID as CASE_7_ID
+from .case_7_polynomial_yeojohnson_tsla import CASE_NAME as CASE_7_NAME
+from .case_7_polynomial_yeojohnson_tsla import run_case as run_case_7
 from .settings import FEATURE_SCALING_CASES
 
 
@@ -35,6 +44,9 @@ CASE_STUDIES: Tuple[CaseStudy, ...] = (
     CaseStudy(CASE_2_ID, CASE_2_NAME, run_case_2),
     CaseStudy(CASE_3_ID, CASE_3_NAME, run_case_3),
     CaseStudy(CASE_4_ID, CASE_4_NAME, run_case_4),
+    CaseStudy(CASE_5_ID, CASE_5_NAME, run_case_5),
+    CaseStudy(CASE_6_ID, CASE_6_NAME, run_case_6),
+    CaseStudy(CASE_7_ID, CASE_7_NAME, run_case_7),
 )
 
 
@@ -54,5 +66,10 @@ def run_all_cases() -> None:
         case.runner()
 
 
-__all__ = ["CaseStudy", "CASE_STUDIES", "FEATURE_SCALING_CASES", "get_case_studies", "run_all_cases"]
-
+__all__ = [
+    "CaseStudy",
+    "CASE_STUDIES",
+    "FEATURE_SCALING_CASES",
+    "get_case_studies",
+    "run_all_cases",
+]

@@ -7,9 +7,15 @@ from datetime import datetime
 from typing import Callable, Dict, Tuple
 
 from config import DEFAULT_STOCKS, DEFAULT_TECH_WINDOWS, ML_INPUT_DIR, YAHOO_DATA_DIR
-from feature_scaling import CASE_STUDIES, run_all_cases
 from core.data_fetch import get_companies_quotes, get_fundamental_data
 from core.data_preparation import prepare_ml_dataset
+from eda_boxplots import (
+    CASE_NAME as EDA_CASE_NAME,
+    DEFAULT_DATASET_FILENAME as EDA_DEFAULT_DATASET,
+    DEFAULT_TICKER as EDA_DEFAULT_TICKER,
+    run_case as run_eda_boxplots,
+)
+from feature_scaling import CASE_STUDIES, run_all_cases
 
 MenuOption = Tuple[str, Callable[[], None] | None]
 
@@ -22,6 +28,7 @@ def _prompt_menu(title: str, options: Dict[str, MenuOption]) -> str:
         print(f"{key}. {label}")
 
     return input("Choose an option: ").strip()
+
 
 def _download_yahoo_data() -> None:
     """Download quotes and fundamentals for selected tickers and store them locally."""
@@ -158,6 +165,27 @@ def _feature_scaling_menu() -> None:
             print("Invalid choice, please try again.")
 
 
+def _run_eda_boxplots() -> None:
+    """Execute the EDA boxplots workflow with basic prompts."""
+
+    print(f"\n{EDA_CASE_NAME}")
+    ticker = input(f"Ticker symbol (default {EDA_DEFAULT_TICKER}): ").strip() or EDA_DEFAULT_TICKER
+    dataset_filename = (
+        input(
+            f"Dataset filename in ML input directory (default {EDA_DEFAULT_DATASET}): "
+        ).strip()
+        or EDA_DEFAULT_DATASET
+    )
+    show_choice = input("Display plots interactively? [y/N]: ").strip().lower()
+    show_plots = show_choice == "y"
+
+    run_eda_boxplots(
+        ticker=ticker,
+        dataset_filename=dataset_filename,
+        show_plots=show_plots,
+    )
+
+
 def main() -> None:
     """Main CLI entry point."""
 
@@ -165,6 +193,7 @@ def main() -> None:
         "1": ("Download Yahoo Finance data", _download_yahoo_data),
         "2": ("Prepare Yahoo Finance data for ML", _prepare_ml_data),
         "3": ("Feature Scaling", _feature_scaling_menu),
+        "4": ("EDA & Boxplots", _run_eda_boxplots),
         "0": ("Exit", None),
     }
 
