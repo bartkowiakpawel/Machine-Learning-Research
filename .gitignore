@@ -28,6 +28,9 @@ ENV/
 *.zip
 *.pkl
 *.h5
+*.joblib
+*.png
+*.json
 
 # Working/output folders – not tracked by default
 data/
