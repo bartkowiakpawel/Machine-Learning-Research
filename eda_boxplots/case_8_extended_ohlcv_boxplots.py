@@ -1,4 +1,4 @@
-"""EDA workflow using extended technical features with 1-day target statistics."""
+﻿"""EDA workflow combining extended technical features with OHLCV rolling statistics."""
 
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ from core.shared_utils import (
     clean_feature_matrix,
     filter_ticker,
     load_ml_dataset,
-    prepare_feature_matrix,
     resolve_output_dir,
     save_dataframe,
     write_case_metadata,
@@ -34,7 +33,6 @@ try:
         DEFAULT_OUTPUT_ROOT,
         DEFAULT_TICKER,
         DEFAULT_TICKERS,
-        EXTENDED_TECH_FEATURES,
         get_case_config,
     )
     from .visualization import (
@@ -49,7 +47,6 @@ except ImportError:
         DEFAULT_OUTPUT_ROOT,
         DEFAULT_TICKER,
         DEFAULT_TICKERS,
-        EXTENDED_TECH_FEATURES,
         get_case_config,
     )
     from eda_boxplots.visualization import (
@@ -59,20 +56,29 @@ except ImportError:
     )
     from eda_boxplots.reporting import export_last_n_day_prediction_reports
 
-CASE_ID = "case_7"
+CASE_ID = "case_8"
 CASE_CONFIG = get_case_config(CASE_ID)
 CASE_NAME = CASE_CONFIG.name
 
 ROLLING_WINDOW = 30
-TARGET_SHIFT = 1
+TARGET_SHIFT = 14
 LAST_N_DAYS = 15
-TECHNICAL_FEATURE_COLUMNS = list(EXTENDED_TECH_FEATURES)
 TARGET_FEATURE_COLUMNS = [
-    "rolling_median_target_1d",
-    "rolling_iqr_target_1d",
-    "rolling_outlier_ratio_target_1d",
+    "rolling_median_target_14d",
+    "rolling_iqr_target_14d",
+    "rolling_outlier_ratio_target_14d",
 ]
-ALL_FEATURE_COLUMNS = TECHNICAL_FEATURE_COLUMNS + TARGET_FEATURE_COLUMNS
+OHLCV_BASE_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
+OHLCV_ROLLING_FEATURE_COLUMNS = [
+    feature
+    for column in OHLCV_BASE_COLUMNS
+    for feature in (
+        f"rolling_median_{column.lower()}_14d",
+        f"rolling_iqr_{column.lower()}_14d",
+        f"rolling_outlier_ratio_{column.lower()}_14d",
+    )
+]
+ALL_FEATURE_COLUMNS = TARGET_FEATURE_COLUMNS + OHLCV_ROLLING_FEATURE_COLUMNS
 
 
 def _normalize_tickers(tickers: Sequence[str] | None) -> list[str]:
@@ -111,23 +117,49 @@ def _compute_target_features(
         raise KeyError("Missing 'Close' column required for target feature computation.")
 
     working = subset.sort_values("Date").copy()
-    working["target_1d"] = (working["Close"].shift(-target_shift) - working["Close"]) / working["Close"]
-    target_series = working["target_1d"]
+    working["target_14d"] = (working["Close"].shift(-target_shift) - working["Close"]) / working["Close"]
+    target_series = working["target_14d"]
 
     rolling_obj = target_series.rolling(window=window, min_periods=window)
-    working["rolling_median_target_1d"] = rolling_obj.median()
-    working["rolling_iqr_target_1d"] = rolling_obj.quantile(0.75) - rolling_obj.quantile(0.25)
-    working["rolling_outlier_ratio_target_1d"] = rolling_obj.apply(_outlier_ratio, raw=False)
+    working["rolling_median_target_14d"] = rolling_obj.median()
+    working["rolling_iqr_target_14d"] = rolling_obj.quantile(0.75) - rolling_obj.quantile(0.25)
+    working["rolling_outlier_ratio_target_14d"] = rolling_obj.apply(_outlier_ratio, raw=False)
 
     feature_frame = working[TARGET_FEATURE_COLUMNS].copy()
     combined = pd.concat([feature_frame, target_series], axis=1).dropna()
 
     feature_matrix = combined[TARGET_FEATURE_COLUMNS].copy()
-    y_target = combined["target_1d"].copy()
+    y_target = combined["target_14d"].copy()
     metadata_columns = [col for col in ("Date", "ticker") if col in working.columns]
     metadata = working.loc[combined.index, metadata_columns].copy()
 
     return feature_matrix, y_target, metadata
+
+
+def _compute_ohlcv_rolling_features(
+    subset: pd.DataFrame,
+    *,
+    window: int,
+) -> pd.DataFrame:
+    missing = [col for col in OHLCV_BASE_COLUMNS if col not in subset.columns]
+    if missing:
+        missing_fmt = ", ".join(missing)
+        raise KeyError(f"Missing OHLCV columns required for rolling features: {missing_fmt}")
+
+    working = subset.sort_values("Date").copy()
+    feature_store: dict[str, pd.Series] = {}
+
+    for column in OHLCV_BASE_COLUMNS:
+        series = pd.to_numeric(working[column], errors="coerce")
+        rolling_obj = series.rolling(window=window, min_periods=window)
+        base = column.lower()
+        feature_store[f"rolling_median_{base}_14d"] = rolling_obj.median()
+        feature_store[f"rolling_iqr_{base}_14d"] = rolling_obj.quantile(0.75) - rolling_obj.quantile(0.25)
+        feature_store[f"rolling_outlier_ratio_{base}_14d"] = rolling_obj.apply(_outlier_ratio, raw=False)
+
+    features_df = pd.DataFrame(feature_store)
+    features_df = features_df.dropna()
+    return features_df
 
 
 def run_case(
@@ -138,7 +170,7 @@ def run_case(
     show_plots: bool = False,
     yeojohnson: bool = False,
 ) -> Path:
-    """Run case 7 combining extended technical features with 1-day target statistics."""
+    """Run case 8 combining extended technical factors with OHLCV rolling features."""
 
     selected_tickers = _normalize_tickers(tickers)
     case_output_dir = resolve_output_dir(CASE_ID, DEFAULT_OUTPUT_ROOT, output_root)
@@ -180,31 +212,57 @@ def run_case(
             print(f"Skipping {ticker} due to missing data: {exc}")
             continue
 
-        technical_matrix = prepare_feature_matrix(
-            subset,
-            TECHNICAL_FEATURE_COLUMNS,
-            target_column=None,
-            target_source=None,
-        )
-        technical_matrix = clean_feature_matrix(technical_matrix)
+        try:
+            ohlcv_features = _compute_ohlcv_rolling_features(
+                subset,
+                window=ROLLING_WINDOW,
+            )
+        except KeyError as exc:
+            print(f"Skipping {ticker} due to missing OHLCV data: {exc}")
+            continue
 
-        common_index = target_features.index.intersection(technical_matrix.index)
+        common_index = target_features.index.intersection(ohlcv_features.index)
         if metadata is not None:
             metadata = metadata.loc[common_index]
         target_series = target_series.loc[common_index]
+
         combined_matrix = pd.concat(
-            [technical_matrix.loc[common_index], target_features.loc[common_index]],
+            [
+                target_features.loc[common_index],
+                ohlcv_features.loc[common_index],
+            ],
             axis=1,
             join="inner",
         )
+        combined_matrix = combined_matrix.loc[:, ALL_FEATURE_COLUMNS]
         combined_matrix = clean_feature_matrix(combined_matrix)
+        if combined_matrix.empty:
+            print(f"Combined feature matrix empty after cleaning for {ticker}; skipping.")
+            continue
         target_series = target_series.loc[combined_matrix.index]
         if metadata is not None:
             metadata = metadata.loc[combined_matrix.index]
 
-        if combined_matrix.empty:
-            print(f"Feature matrix empty after cleaning for {ticker}; skipping.")
+        if metadata is None or metadata.empty:
+            print(f"Insufficient metadata for validation for {ticker}; skipping.")
             continue
+
+        ticker_dir = case_output_dir / ticker.lower()
+        ticker_dir.mkdir(parents=True, exist_ok=True)
+
+        matrix_path = save_dataframe(
+            combined_matrix,
+            ticker_dir,
+            f"{ticker.lower()}_{CASE_ID}_extended_ohlcv_features{'_yeojohnson' if yeojohnson else ''}.csv",
+        )
+        print(f"extended OHLCV + target rolling feature matrix for {ticker} saved to: {matrix_path}")
+
+        summary_path = save_dataframe(
+            combined_matrix.describe(include="all").transpose(),
+            ticker_dir,
+            f"{ticker.lower()}_{CASE_ID}_extended_ohlcv_features_summary{'_yeojohnson' if yeojohnson else ''}.csv",
+        )
+        print(f"extended OHLCV + target rolling feature summary for {ticker} saved to: {summary_path}")
 
         if yeojohnson:
             transformer = PowerTransformer(method="yeo-johnson")
@@ -215,29 +273,12 @@ def run_case(
                 index=combined_matrix.index,
             )
 
-        ticker_dir = case_output_dir / ticker.lower()
-        ticker_dir.mkdir(parents=True, exist_ok=True)
-
-        matrix_path = save_dataframe(
-            combined_matrix,
-            ticker_dir,
-            f"{ticker.lower()}_{CASE_ID}_hybrid_features{'_yeojohnson' if yeojohnson else ''}.csv",
-        )
-        print(f"Hybrid feature matrix for {ticker} saved to: {matrix_path}")
-
-        summary_path = save_dataframe(
-            combined_matrix.describe(include="all").transpose(),
-            ticker_dir,
-            f"{ticker.lower()}_{CASE_ID}_hybrid_features_summary{'_yeojohnson' if yeojohnson else ''}.csv",
-        )
-        print(f"Hybrid feature summary for {ticker} saved to: {summary_path}")
-
-        per_ticker_frames[ticker] = combined_matrix.copy()
+        per_ticker_frames[ticker] = combined_matrix[ALL_FEATURE_COLUMNS].copy()
         combined_frames.append(combined_matrix.assign(ticker=ticker))
 
-        if metadata is None or {"Date", "ticker"}.difference(metadata.columns):
-            print(f"Metadata missing required columns for {ticker}; skipping validation.")
-            continue
+        dataset_label = f"{ticker} {CASE_ID} extended OHLCV"
+        if yeojohnson:
+            dataset_label += " (Yeo-Johnson)"
 
         try:
             result = evaluate_last_n_day_predictions(
@@ -245,7 +286,7 @@ def run_case(
                 combined_matrix,
                 target_series,
                 metadata=metadata,
-                dataset_label=f"{ticker} {CASE_ID} hybrid features",
+                dataset_label=dataset_label,
                 n_days=LAST_N_DAYS,
                 ticker_column="ticker",
                 date_column="Date",
@@ -260,16 +301,17 @@ def run_case(
             continue
 
         predictions_frame = result.predictions.copy()
-        predictions_frame.insert(0, "dataset", f"{ticker} {CASE_ID} hybrid features")
+        predictions_frame.insert(0, "dataset", dataset_label)
+        predictions_frame["ticker"] = ticker
         if {"actual", "prediction"}.issubset(predictions_frame.columns):
             predictions_frame["prediction_diff"] = predictions_frame["prediction"] - predictions_frame["actual"]
-        aggregated_predictions.append(predictions_frame)
 
         model_metrics.append(result.model_metrics.assign(ticker=ticker))
         ticker_metrics.append(result.per_ticker_metrics.assign(ticker=ticker))
+        aggregated_predictions.append(predictions_frame)
 
     if not per_ticker_frames:
-        print("No tickers produced usable data; aborting case.")
+        print("No tickers produced valid feature matrices; exiting.")
         return case_output_dir
 
     combined_df = pd.concat(combined_frames, ignore_index=True)
@@ -278,30 +320,30 @@ def run_case(
     combined_matrix_path = save_dataframe(
         combined_df,
         comparison_dir,
-        f"{ticker_bundle}_{CASE_ID}_hybrid_features{'_yeojohnson' if yeojohnson else ''}_combined.csv",
+        f"{ticker_bundle}_{CASE_ID}_extended_ohlcv_features{'_yeojohnson' if yeojohnson else ''}_combined.csv",
     )
-    print(f"Combined hybrid feature matrix saved to: {combined_matrix_path}")
+    print(f"Combined extended OHLCV + target rolling feature matrix saved to: {combined_matrix_path}")
 
     summary = combined_df.groupby("ticker")[ALL_FEATURE_COLUMNS].describe()
     summary.columns = [f"{feature}_{stat}" for feature, stat in summary.columns]
     summary_path = save_dataframe(
         summary,
         comparison_dir,
-        f"{ticker_bundle}_{CASE_ID}_hybrid_features_summary_by_ticker{'_yeojohnson' if yeojohnson else ''}.csv",
+        f"{ticker_bundle}_{CASE_ID}_extended_ohlcv_features_summary_by_ticker{'_yeojohnson' if yeojohnson else ''}.csv",
     )
-    print(f"Per-ticker hybrid feature summary saved to: {summary_path}")
+    print(f"Per-ticker extended OHLCV + target rolling feature summary saved to: {summary_path}")
 
     color_map = build_color_map(per_ticker_frames.keys())
 
     comparison_plot_path = plot_features_boxplot(
-        {ticker: frame[ALL_FEATURE_COLUMNS] for ticker, frame in per_ticker_frames.items()},
+        per_ticker_frames,
         ALL_FEATURE_COLUMNS,
-        title=f"{CASE_ID} hybrid features{' (Yeo-Johnson)' if yeojohnson else ''}: {'/'.join(per_ticker_frames.keys())}",
+        title=f"{CASE_ID} extended OHLCV features{' (Yeo-Johnson)' if yeojohnson else ''}: {'/'.join(per_ticker_frames.keys())}",
         output_dir=comparison_dir,
         show=show_plots,
         color_map=color_map,
     )
-    print(f"Hybrid feature boxplot grid saved to: {comparison_plot_path}")
+    print(f"Extended OHLCV feature boxplot grid saved to: {comparison_plot_path}")
 
     single_plot_records: list[dict[str, str]] = []
     for feature in ALL_FEATURE_COLUMNS:
@@ -329,17 +371,17 @@ def run_case(
                 "boxplot_path": str(plot_path),
             }
         )
-        print(f"Single-feature hybrid comparison saved to: {plot_path}")
+        print(f"Single-feature extended comparison saved to: {plot_path}")
 
     if single_plot_records:
         single_index_path = save_dataframe(
             pd.DataFrame(single_plot_records),
             single_plots_dir,
-            f"{ticker_bundle}_{CASE_ID}_single_hybrid_boxplots{'_yeojohnson' if yeojohnson else ''}.csv",
+            f"{ticker_bundle}_{CASE_ID}_single_extended_ohlcv_boxplots{'_yeojohnson' if yeojohnson else ''}.csv",
         )
-        print(f"Single feature hybrid boxplot index saved to: {single_index_path}")
+        print(f"Single feature extended OHLCV boxplot index saved to: {single_index_path}")
     else:
-        print("No single-feature hybrid boxplots were generated.")
+        print("No single-feature extended OHLCV boxplots were generated.")
 
     if aggregated_predictions:
         combined_predictions = pd.concat(aggregated_predictions, ignore_index=True)
@@ -402,10 +444,6 @@ def run_case(
     if reports_dir.exists():
         artifacts["reports_dir"] = "reports"
 
-    transformations = []
-    if yeojohnson:
-        transformations.append("Yeo-Johnson")
-
     write_case_metadata(
         case_dir=case_output_dir,
         case_id=CASE_ID,
@@ -414,27 +452,29 @@ def run_case(
         dataset_path=dataset_path,
         tickers=selected_tickers,
         features={
-            "technical_features": TECHNICAL_FEATURE_COLUMNS,
             "target_features": TARGET_FEATURE_COLUMNS,
+            "ohlcv_rolling_features": OHLCV_ROLLING_FEATURE_COLUMNS,
             "combined_features": ALL_FEATURE_COLUMNS,
         },
-        target="target_1d",
+        target="target_14d",
         models=tuple(MODEL_DICT.keys()),
         extras={
             "last_n_day_validation": LAST_N_DAYS,
             "artifacts": artifacts,
-            "transformations": transformations,
+            "transformations": ["Yeo-Johnson"] if yeojohnson else [],
             "yeojohnson_enabled": yeojohnson,
             "target_shift_days": TARGET_SHIFT,
+            "rolling_window": ROLLING_WINDOW,
         },
     )
 
     return case_output_dir
 
 
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the extended technical + 1-day target boxplot workflow.",
+        description="Run the extended OHLCV feature boxplot workflow.",
     )
     parser.add_argument(
         "--dataset",
@@ -476,3 +516,7 @@ if __name__ == "__main__":
         show_plots=args.show_plots,
         yeojohnson=args.yeojohnson,
     )
+
+
+
+

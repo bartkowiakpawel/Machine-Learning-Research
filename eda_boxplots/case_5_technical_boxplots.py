@@ -16,13 +16,14 @@ import numpy as np
 import pandas as pd
 
 from config import ML_INPUT_DIR, MODEL_DICT
-from feature_scaling._shared import (
+from core.shared_utils import (
     clean_feature_matrix,
     filter_ticker,
     load_ml_dataset,
     prepare_feature_matrix,
     resolve_output_dir,
     save_dataframe,
+    write_case_metadata,
 )
 from core.prediction_validation import evaluate_last_n_day_predictions
 
@@ -40,6 +41,7 @@ try:
         plot_features_boxplot,
         plot_single_feature_boxplot,
     )
+    from .reporting import export_last_n_day_prediction_reports
 except ImportError:
     from eda_boxplots.settings import (
         DEFAULT_DATASET_FILENAME,
@@ -54,6 +56,7 @@ except ImportError:
         plot_features_boxplot,
         plot_single_feature_boxplot,
     )
+    from eda_boxplots.reporting import export_last_n_day_prediction_reports
 
 CASE_ID = "case_5"
 CASE_CONFIG = get_case_config(CASE_ID)
@@ -293,6 +296,23 @@ def run_case(
         with pd.ExcelWriter(excel_path) as writer:
             combined_predictions.to_excel(writer, index=False, sheet_name="predictions")
         print(f"Validation predictions Excel saved to: {excel_path}")
+        report_paths = export_last_n_day_prediction_reports(
+            combined_predictions,
+            case_id=CASE_ID,
+            case_output_dir=case_output_dir,
+            ticker_bundle=ticker_bundle,
+            last_n_days=LAST_N_DAYS,
+            yeojohnson=yeojohnson,
+        )
+        pivot_report_path = report_paths.get("case_pivot_layout")
+        if pivot_report_path:
+            print(f"Pivot-style validation summary saved to: {pivot_report_path}")
+        case_summary_excel = report_paths.get("case_summary_excel")
+        if case_summary_excel:
+            print(f"Case standard summary workbook saved to: {case_summary_excel}")
+        shared_summary_excel = report_paths.get("standard_summary_excel")
+        if shared_summary_excel:
+            print(f"Shared standard summary workbook saved to: {shared_summary_excel}")
 
     if model_metrics:
         combined_model_metrics = pd.concat(model_metrics, ignore_index=True)
@@ -311,6 +331,42 @@ def run_case(
             f"{ticker_bundle}_{CASE_ID}_last_{LAST_N_DAYS}_day_metrics_by_ticker{'_yeojohnson' if yeojohnson else ''}.csv",
         )
         print(f"Validation per-ticker metrics saved to: {ticker_metrics_path}")
+
+    per_ticker_dirs = sorted(t.lower() for t in per_ticker_frames)
+    artifacts = {
+        "comparison_dir": "comparison",
+        "single_feature_plots_dir": "comparison/single_feature_plots",
+        "validation_dir": "comparison/last_n_day_validation",
+        "models_dir": "models",
+        "per_ticker_dirs": per_ticker_dirs,
+    }
+    reports_dir = case_output_dir / "reports"
+    if reports_dir.exists():
+        artifacts["reports_dir"] = "reports"
+
+    transformations = []
+    if yeojohnson:
+        transformations.append("Yeo-Johnson")
+
+    write_case_metadata(
+        case_dir=case_output_dir,
+        case_id=CASE_ID,
+        case_name=CASE_NAME,
+        package="eda_boxplots",
+        dataset_path=dataset_path,
+        tickers=selected_tickers,
+        features={
+            "technical_features": TECHNICAL_FEATURE_COLUMNS,
+        },
+        target="target_14d",
+        models=tuple(MODEL_DICT.keys()),
+        extras={
+            "last_n_day_validation": LAST_N_DAYS,
+            "artifacts": artifacts,
+            "transformations": transformations,
+            "yeojohnson_enabled": yeojohnson,
+        },
+    )
 
     return case_output_dir
 

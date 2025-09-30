@@ -16,7 +16,7 @@ import pandas as pd
 from sklearn.preprocessing import PowerTransformer
 
 from config import ML_INPUT_DIR
-from feature_scaling._shared import (
+from core.shared_utils import (
     clean_feature_matrix,
     filter_ticker,
     load_ml_dataset,
@@ -287,3 +287,4 @@ if __name__ == "__main__":
         output_root=output_root,
         show_plots=args.show_plots,
     )
+

@@ -1,4 +1,4 @@
-﻿"""Case study 2: inspect ML dataset for TSLA."""
+"""Case study 2: inspect ML dataset for TSLA."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from sklearn.preprocessing import PowerTransformer
 from config import ML_INPUT_DIR, MODEL_DICT
 from core.prediction_validation import evaluate_last_n_day_predictions
 from core.visualization import plot_features_distribution_grid
-from feature_scaling._shared import (
+from core.shared_utils import (
     clean_feature_matrix,
     filter_ticker,
     load_ml_dataset,
@@ -276,3 +276,4 @@ def run_case(
 
 if __name__ == "__main__":
     run_case(show_plots=True)
+

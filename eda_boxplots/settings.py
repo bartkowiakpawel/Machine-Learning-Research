@@ -6,14 +6,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from feature_scaling.settings import FEATURE_SCALING_CASES
-
 DEFAULT_TICKER: str = "TSLA"
 DEFAULT_TICKERS: tuple[str, ...] = ("TSLA", "AAPL", "MSFT")
 DEFAULT_DATASET_FILENAME: str = "ml_dataset.csv"
 DEFAULT_OUTPUT_ROOT = Path("eda_boxplots") / "outputs"
-DEFAULT_FEATURES: Sequence[str] = tuple(
-    FEATURE_SCALING_CASES.get("case_4", {}).get("features", [])
+DEFAULT_FEATURES: Sequence[str] = (
+    "OpenCloseReturn",
+    "IntradayRange",
+    "rsi_14",
+    "Volume_vs_MA14",
 )
 DEFAULT_TARGET_FEATURES: Sequence[str] = (
     "rolling_median_target_14d",
@@ -109,6 +110,11 @@ _CASE_CONFIGS: Mapping[str, CaseConfig] = {
         case_id="case_7",
         name="Case 7: extended technical + 1-day target boxplots",
         description="Use an extended technical feature set together with 1-day forward return statistics.",
+    ),
+    "case_8": CaseConfig(
+        case_id="case_8",
+        name="Case 8: extended OHLCV rolling feature boxplots",
+        description="Augment extended technical factors with rolling OHLCV statistics and 1-day target validation.",
     ),
 }
 
