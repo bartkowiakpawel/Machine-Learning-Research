@@ -14,6 +14,9 @@ from .case_5_technical_boxplots import run_case as run_case_5
 from .case_6_hybrid_1d_boxplots import run_case as run_case_6
 from .case_7_extended_hybrid_boxplots import run_case as run_case_7
 from .case_8_extended_ohlcv_boxplots import run_case as run_case_8
+from .case_9_core_feature_rolling_boxplots import run_case as run_case_9
+from .case_10_predictions_comparison import run_case as run_case_10
+from .case_11_hybrid_1d_boxplots_60d import run_case as run_case_11
 from .settings import (
     AVAILABLE_CASE_IDS,
     DEFAULT_DATASET_FILENAME,
@@ -46,6 +49,9 @@ CASE_STUDIES: Tuple[CaseStudy, ...] = (
     CaseStudy(case_id="case_6", title=get_case_config("case_6").name, runner=run_case_6),
     CaseStudy(case_id="case_7", title=get_case_config("case_7").name, runner=run_case_7),
     CaseStudy(case_id="case_8", title=get_case_config("case_8").name, runner=run_case_8),
+    CaseStudy(case_id="case_9", title=get_case_config("case_9").name, runner=run_case_9),
+    CaseStudy(case_id="case_10", title=get_case_config("case_10").name, runner=run_case_10),
+    CaseStudy(case_id="case_11", title=get_case_config("case_11").name, runner=run_case_11),
 )
 
 _CASE_RUNNERS = {case.case_id: case.runner for case in CASE_STUDIES}

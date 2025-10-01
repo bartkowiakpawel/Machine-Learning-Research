@@ -117,6 +117,38 @@ def _to_numpy(data: Any, feature_order: list[str] | None) -> Any:
     return data
 
 
+def _absolute_percentage_errors(y_true: pd.Series | np.ndarray, y_pred: pd.Series | np.ndarray, *, epsilon: float = 1e-8) -> np.ndarray:
+    """Return absolute percentage errors (in percent) excluding near-zero actuals."""
+
+    true_arr = np.asarray(y_true, dtype=float)
+    pred_arr = np.asarray(y_pred, dtype=float)
+    denom = np.abs(true_arr)
+    mask = denom > epsilon
+    if not np.any(mask):
+        return np.empty(0, dtype=float)
+    return np.abs((true_arr[mask] - pred_arr[mask]) / denom[mask]) * 100.0
+
+
+
+def _mean_absolute_percentage_error(y_true: pd.Series | np.ndarray, y_pred: pd.Series | np.ndarray, *, epsilon: float = 1e-8) -> float:
+    """Return the mean absolute percentage error in percent, ignoring near-zero actuals."""
+
+    errors = _absolute_percentage_errors(y_true, y_pred, epsilon=epsilon)
+    if errors.size == 0:
+        return float('nan')
+    return float(np.mean(errors))
+
+
+
+def _median_absolute_percentage_error(y_true: pd.Series | np.ndarray, y_pred: pd.Series | np.ndarray, *, epsilon: float = 1e-8) -> float:
+    """Return the median absolute percentage error in percent, ignoring near-zero actuals."""
+
+    errors = _absolute_percentage_errors(y_true, y_pred, epsilon=epsilon)
+    if errors.size == 0:
+        return float('nan')
+    return float(np.median(errors))
+
+
 def _compute_per_ticker_metrics(
     frame: pd.DataFrame,
     *,
@@ -128,10 +160,14 @@ def _compute_per_ticker_metrics(
     for ticker, group in frame.groupby(ticker_column, sort=False):
         mae = mean_absolute_error(group[true_col], group[pred_col])
         rmse = math.sqrt(mean_squared_error(group[true_col], group[pred_col]))
+        mape = _mean_absolute_percentage_error(group[true_col], group[pred_col])
+        median_mape = _median_absolute_percentage_error(group[true_col], group[pred_col])
         records.append({
             ticker_column: ticker,
             "MAE": mae,
             "RMSE": rmse,
+            "MAPE": mape,
+            "Median_MAPE": median_mape,
             "n_samples": len(group),
         })
     return pd.DataFrame(records)
@@ -321,6 +357,8 @@ def evaluate_last_n_day_predictions(
 
         mae = mean_absolute_error(y_test, predictions)
         rmse = math.sqrt(mean_squared_error(y_test, predictions))
+        mape = _mean_absolute_percentage_error(y_test, predictions)
+        median_mape = _median_absolute_percentage_error(y_test, predictions)
         model_records.append(
             {
                 "dataset": dataset_label,
@@ -329,6 +367,8 @@ def evaluate_last_n_day_predictions(
                 "test_size": len(X_test),
                 "MAE": mae,
                 "RMSE": rmse,
+                "MAPE": mape,
+                "Median_MAPE": median_mape,
             }
         )
 

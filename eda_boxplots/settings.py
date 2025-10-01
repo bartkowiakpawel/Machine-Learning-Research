@@ -116,6 +116,21 @@ _CASE_CONFIGS: Mapping[str, CaseConfig] = {
         name="Case 8: extended OHLCV rolling feature boxplots",
         description="Augment extended technical factors with rolling OHLCV statistics and 1-day target validation.",
     ),
+    "case_9": CaseConfig(
+        case_id="case_9",
+        name="Case 9: core feature rolling statistics boxplots",
+        description="Track rolling statistics for core engineered features alongside the 14-day forward return.",
+    ),
+    "case_10": CaseConfig(
+        case_id="case_10",
+        name="Case 10: cross-case prediction comparison",
+        description="Compare last-n-day predictions from cases 3-9 against actual returns via overlayed line charts.",
+    ),
+    "case_11": CaseConfig(
+        case_id="case_11",
+        name="Case 11: hybrid 1-day target (60-day window)",
+        description="Repeat the hybrid 1-day workflow using 60-day rolling statistics for target engineering.",
+    ),
 }
 
 
