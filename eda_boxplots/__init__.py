@@ -1,4 +1,4 @@
-"""EDA & Boxplots case registry."""
+﻿"""EDA & Boxplots case registry."""
 
 from __future__ import annotations
 
@@ -17,6 +17,10 @@ from .case_8_extended_ohlcv_boxplots import run_case as run_case_8
 from .case_9_core_feature_rolling_boxplots import run_case as run_case_9
 from .case_10_predictions_comparison import run_case as run_case_10
 from .case_11_hybrid_1d_boxplots_60d import run_case as run_case_11
+from .case_12_seaborn_ticker_boxplots import run_case as run_case_12
+from .case_13_seaborn_all_features_boxplots import run_case as run_case_13
+from .case_14_seaborn_log_volume_boxplots import run_case as run_case_14
+from .case_15_scaled_feature_boxplots import run_case as run_case_15
 from .settings import (
     AVAILABLE_CASE_IDS,
     DEFAULT_DATASET_FILENAME,
@@ -52,6 +56,10 @@ CASE_STUDIES: Tuple[CaseStudy, ...] = (
     CaseStudy(case_id="case_9", title=get_case_config("case_9").name, runner=run_case_9),
     CaseStudy(case_id="case_10", title=get_case_config("case_10").name, runner=run_case_10),
     CaseStudy(case_id="case_11", title=get_case_config("case_11").name, runner=run_case_11),
+    CaseStudy(case_id="case_12", title=get_case_config("case_12").name, runner=run_case_12),
+    CaseStudy(case_id="case_13", title=get_case_config("case_13").name, runner=run_case_13),
+    CaseStudy(case_id="case_14", title=get_case_config("case_14").name, runner=run_case_14),
+    CaseStudy(case_id="case_15", title=get_case_config("case_15").name, runner=run_case_15),
 )
 
 _CASE_RUNNERS = {case.case_id: case.runner for case in CASE_STUDIES}
@@ -61,6 +69,7 @@ def get_case_studies() -> Tuple[CaseStudy, ...]:
     """Return the registered EDA boxplot case studies."""
 
     return CASE_STUDIES
+
 
 
 def run_case_by_id(case_id: str, **kwargs):
@@ -89,3 +98,6 @@ __all__ = [
     "get_case_studies",
     "run_case_by_id",
 ]
+
+
+

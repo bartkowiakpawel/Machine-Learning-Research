@@ -1,4 +1,4 @@
-"""Configuration helpers for the EDA boxplots package."""
+﻿"""Configuration helpers for the EDA boxplots package."""
 
 from __future__ import annotations
 
@@ -131,6 +131,27 @@ _CASE_CONFIGS: Mapping[str, CaseConfig] = {
         name="Case 11: hybrid 1-day target (60-day window)",
         description="Repeat the hybrid 1-day workflow using 60-day rolling statistics for target engineering.",
     ),
+    "case_12": CaseConfig(
+        case_id="case_12",
+        name="Case 12: seaborn per-ticker boxplots (1-day target)",
+        description="Render horizontal seaborn boxplots per ticker using 1-day target statistics (30-day rolling).",
+    ),
+    "case_13": CaseConfig(
+        case_id="case_13",
+        name="Case 13: seaborn all-feature boxplots (1-day target)",
+        description="Render large horizontal seaborn boxplots with every numeric feature and 1-day target statistics.",
+    ),
+
+    "case_14": CaseConfig(
+        case_id="case_14",
+        name="Case 14: seaborn log-volume boxplots (1-day target)",
+        description="Extend case 13 by log-transforming volume-derived features prior to plotting.",
+    ),
+    "case_15": CaseConfig(
+        case_id="case_15",
+        name="Case 15: scaled AAPL feature boxplots (1-day target)",
+        description="Focus on curated technical signals for AAPL with feature-specific scalers and 1-day validation.",
+    ),
 }
 
 
@@ -157,3 +178,6 @@ __all__ = [
     "AVAILABLE_CASE_IDS",
     "get_case_config",
 ]
+
+
+

@@ -31,7 +31,7 @@ ENV/
 *.joblib
 *.png
 *.json
-*.txt
+
 
 # Working/output folders – not tracked by default
 data/
