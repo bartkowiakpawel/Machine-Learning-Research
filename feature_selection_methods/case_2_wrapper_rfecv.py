@@ -12,6 +12,7 @@ if __package__ in (None, ""):
     sys.path.append(str(_Path(__file__).resolve().parents[1]))
 
 import pandas as pd
+import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_selection import RFECV
 from sklearn.model_selection import TimeSeriesSplit
@@ -152,7 +153,21 @@ def run_case(
     print(f"Selected feature list saved to: {selected_path}")
 
     if hasattr(selector, "cv_results_"):
-        cv_results = pd.DataFrame(selector.cv_results_)
+        cv_results_dict: dict[str, np.ndarray] = {}
+        for key, values in selector.cv_results_.items():
+            arr = np.asarray(values)
+            if arr.ndim == 0:
+                cv_results_dict[key] = np.repeat(arr, len(ranking))
+                continue
+            if arr.ndim == 1:
+                cv_results_dict[key] = arr
+                continue
+            flattened = arr.reshape(arr.shape[0], -1)
+            column_count = flattened.shape[1]
+            for idx in range(column_count):
+                suffix = f"_{idx}" if column_count > 1 else ""
+                cv_results_dict[f"{key}{suffix}"] = flattened[:, idx]
+        cv_results = pd.DataFrame(cv_results_dict)
         cv_results_path = save_dataframe(cv_results, case_output_dir, "rfecv_cv_results.csv")
         print(f"Cross-validation diagnostics saved to: {cv_results_path}")
 
@@ -168,11 +183,11 @@ def run_case(
         models=("GradientBoostingRegressor",),
         extras={
             "method": CASE_METHOD,
-            "cv_splits": n_splits,
-            "selected_feature_count": len(selected_features),
-            "min_features_to_select": selector.min_features_to_select,
-            "optimal_feature_count": getattr(selector, "n_features_", len(selected_features)),
-            "total_features_considered": len(feature_list),
+            "cv_splits": int(n_splits),
+            "selected_feature_count": int(len(selected_features)),
+            "min_features_to_select": int(selector.min_features_to_select),
+            "optimal_feature_count": int(getattr(selector, "n_features_", len(selected_features))),
+            "total_features_considered": int(len(feature_list)),
             "missing_features": missing_features,
             "target_source": target_source,
         },

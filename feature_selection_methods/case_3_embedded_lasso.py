@@ -11,6 +11,7 @@ if __package__ in (None, ""):
 
     sys.path.append(str(_Path(__file__).resolve().parents[1]))
 
+import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.linear_model import LassoCV
 from sklearn.model_selection import TimeSeriesSplit
@@ -163,13 +164,30 @@ def run_case(
         print("Selected features: none retained by Lasso.")
     print(f"Selected feature details saved to: {selected_path}")
 
+    mse_values = lasso.mse_path_
     mse_df = pd.DataFrame(
-        lasso.mse_path_.T,
-        columns=[f"fold_{idx + 1}" for idx in range(lasso.mse_path_.shape[1])],
+        mse_values,
+        columns=[f"fold_{idx + 1}" for idx in range(mse_values.shape[1])],
     )
     mse_df.insert(0, "alpha", lasso.alphas_)
     mse_path = save_dataframe(mse_df, case_output_dir, "lasso_mse_path.csv")
     print(f"Lasso cross-validation MSE path saved to: {mse_path}")
+
+    fold_columns = [column for column in mse_df.columns if column.startswith("fold_")]
+    if fold_columns:
+        mse_plot_df = mse_df.copy()
+        mse_plot_df["mean_mse"] = mse_plot_df[fold_columns].mean(axis=1)
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(mse_plot_df["alpha"], mse_plot_df["mean_mse"], marker="o")
+        ax.set_xlabel("alpha (siła regularyzacji)")
+        ax.set_ylabel("Średni MSE (niżej = lepiej)")
+        ax.set_title("Ścieżka walidacji LassoCV")
+        ax.set_xscale("log")
+        plot_path = case_output_dir / "lasso_mse_path.png"
+        fig.tight_layout()
+        fig.savefig(plot_path, dpi=300)
+        plt.close(fig)
+        print(f"Lasso MSE path plot saved to: {plot_path}")
 
     metadata_path = write_case_metadata(
         case_dir=case_output_dir,
@@ -183,10 +201,10 @@ def run_case(
         models=("LassoCV",),
         extras={
             "method": CASE_METHOD,
-            "cv_splits": n_splits,
+            "cv_splits": int(n_splits),
             "alpha": float(lasso.alpha_),
-            "selected_feature_count": len(selected_features),
-            "top_k": adjusted_top_k,
+            "selected_feature_count": int(len(selected_features)),
+            "top_k": int(adjusted_top_k),
             "missing_features": missing_features,
             "target_source": target_source,
         },

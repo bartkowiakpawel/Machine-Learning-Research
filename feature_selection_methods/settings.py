@@ -64,6 +64,30 @@ FEATURE_SELECTION_CASES: Mapping[str, FeatureSelectionCase] = {
         top_k=12,
         tickers=("TSLA", "AAPL"),
     ),
+    "case_4": FeatureSelectionCase(
+        case_id="case_4",
+        name="Case 4: RFECV vs brute-force feature sets",
+        method="comparison_rfecv_bruteforce",
+        description="Compare GradientBoosting performance for RFECV-selected features against all feature combinations.",
+        top_k=None,
+        tickers=("TSLA",),
+    ),
+    "case_5": FeatureSelectionCase(
+        case_id="case_5",
+        name="Case 5: RFECV vs brute-force (Robust scaled)",
+        method="comparison_rfecv_bruteforce_robust",
+        description="Compare RFECV and exhaustive feature sets with GradientBoosting after RobustScaler preprocessing.",
+        top_k=None,
+        tickers=("TSLA",),
+    ),
+    "case_6": FeatureSelectionCase(
+        case_id="case_6",
+        name="Case 6: RFECV vs brute-force (Robust scaled Ridge)",
+        method="comparison_rfecv_bruteforce_ridge",
+        description="Compare RFECV and exhaustive feature sets with RobustScaler + Ridge regression.",
+        top_k=None,
+        tickers=("TSLA",),
+    ),
 }
 
 
