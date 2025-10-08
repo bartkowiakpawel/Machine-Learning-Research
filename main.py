@@ -15,6 +15,10 @@ from eda_boxplots import (
     DEFAULT_TICKERS as EDA_DEFAULT_TICKERS,
 )
 from feature_scaling import CASE_STUDIES, run_all_cases
+from feature_selection_methods import (
+    CASE_STUDIES as FS_CASE_STUDIES,
+    run_all_cases as run_all_feature_selection_cases,
+)
 
 MenuOption = Tuple[str, Callable[[], None] | None]
 
@@ -164,6 +168,37 @@ def _feature_scaling_menu() -> None:
             print("Invalid choice, please try again.")
 
 
+def _feature_selection_menu() -> None:
+    """Handle feature selection sub-menu."""
+
+    while True:
+        print("\nFeature Selection Methods - available case studies:")
+        print("1. Run all case studies")
+        for idx, case in enumerate(FS_CASE_STUDIES, start=2):
+            print(f"{idx}. {case.case_id} - {case.title}")
+        print("0. Return to main menu")
+
+        choice = input("Choose an option: ").strip()
+
+        if choice == "0":
+            return
+        if choice == "1":
+            run_all_feature_selection_cases()
+            continue
+
+        try:
+            numeric_choice = int(choice)
+        except ValueError:
+            print("Invalid choice, please try again.")
+            continue
+
+        case_index = numeric_choice - 2
+        if 0 <= case_index < len(FS_CASE_STUDIES):
+            FS_CASE_STUDIES[case_index].runner()
+        else:
+            print("Invalid choice, please try again.")
+
+
 def _prompt_eda_inputs() -> tuple[str, list[str], bool]:
     """Collect common CLI inputs for EDA boxplot cases."""
 
@@ -232,7 +267,8 @@ def main() -> None:
         "1": ("Download Yahoo Finance data", _download_yahoo_data),
         "2": ("Prepare Yahoo Finance data for ML", _prepare_ml_data),
         "3": ("Feature Scaling", _feature_scaling_menu),
-        "4": ("EDA & Boxplots", _run_eda_boxplots),
+        "4": ("Feature Selection Methods", _feature_selection_menu),
+        "5": ("EDA & Boxplots", _run_eda_boxplots),
         "0": ("Exit", None),
     }
 

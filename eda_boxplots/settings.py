@@ -152,6 +152,21 @@ _CASE_CONFIGS: Mapping[str, CaseConfig] = {
         name="Case 15: scaled AAPL feature boxplots (1-day target)",
         description="Focus on curated technical signals for AAPL with feature-specific scalers and 1-day validation.",
     ),
+    "case_16": CaseConfig(
+        case_id="case_16",
+        name="Case 16: error metric distribution boxplots",
+        description="Aggregate MAE/RMSE validation scores across prior cases and visualise them via boxplots.",
+    ),
+    "case_17": CaseConfig(
+        case_id="case_17",
+        name="Case 17: boxplot vs histogram vs violin comparison",
+        description="Showcase how a single feature distribution differs across boxplot, histogram, and violin representations.",
+    ),
+    "case_18": CaseConfig(
+        case_id="case_18",
+        name="Case 18: TSLA combined feature distribution comparisons",
+        description="Generate boxplot, histogram, and violin views for TSLA combined feature set.",
+    ),
 }
 
 
