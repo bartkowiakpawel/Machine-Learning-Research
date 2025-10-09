@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 from typing import Sequence
 
@@ -13,13 +12,19 @@ if __package__ in (None, ""):
 
     sys.path.append(str(_Path(__file__).resolve().parents[1]))
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from pandas.api import types as ptypes
 
 from config import ML_INPUT_DIR, MODEL_DICT
+from core.feature_expansion import (
+    TARGET_FEATURE_COLUMNS as CORE_TARGET_FEATURE_COLUMNS,
+    expand_base_features,
+)
+from core.distribution_plots import (
+    compute_distribution_summary,
+    plot_distribution_grid,
+)
 from core.shared_utils import (
     clean_feature_matrix,
     filter_ticker,
@@ -47,14 +52,11 @@ TARGET_SHIFT = 1
 LAST_N_DAYS = 15
 TARGET_COLUMN = "target_1d"
 INTRADAY_ROLLING_WINDOW = 14
-TARGET_FEATURE_COLUMNS = [
-    "rolling_median_target_1d",
-    "rolling_iqr_target_1d",
-    "rolling_outlier_ratio_target_1d",
-]
+TARGET_FEATURE_COLUMNS = list(CORE_TARGET_FEATURE_COLUMNS)
+INTRADAY_BASE_FEATURE = "IntradayRange"
 INTRADAY_FEATURE_COLUMNS = [
-    "intradayrange_volatility",
-    "intradayrange_zscore",
+    f"intradayrange_volatility_{INTRADAY_ROLLING_WINDOW}",
+    f"intradayrange_zscore_{INTRADAY_ROLLING_WINDOW}",
     "intradayrange_risk_level",
     "intradayrange_risk_level_code",
 ]
@@ -108,75 +110,25 @@ def _prepare_model_matrix(df: pd.DataFrame, features: Sequence[str]) -> pd.DataF
 
 
 def _augment_dataset(df: pd.DataFrame, *, window: int, target_shift: int) -> pd.DataFrame:
-    if "Close" not in df.columns:
-        raise KeyError(
-            "Dataset missing 'Close' column required to compute target-based features."
-        )
-    if "Date" not in df.columns:
-        raise KeyError(
-        "Dataset missing 'Date' column required to compute rolling target statistics."
-    )
+    required_columns = {"Close", "Date", "ticker", INTRADAY_BASE_FEATURE}
+    missing = [col for col in required_columns if col not in df.columns]
+    if missing:
+        missing_fmt = ", ".join(sorted(missing))
+        raise KeyError(f"Dataset missing required columns for augmentation: {missing_fmt}")
 
     augmented = df.copy()
     augmented["Date"] = pd.to_datetime(augmented["Date"], errors="coerce")
     if augmented["Date"].isna().any():
         raise ValueError("Date column contains values that could not be parsed to datetime.")
 
-    for ticker, group in augmented.groupby("ticker"):
-        ordered = group.sort_values("Date").copy()
-
-        # Compute 1-day forward return target features
-        target_col = ordered["Close"].shift(-target_shift)
-        ordered[TARGET_COLUMN] = (target_col - ordered["Close"]) / ordered["Close"]
-        rolling_obj = ordered[TARGET_COLUMN].rolling(window=window, min_periods=window)
-        ordered["rolling_median_target_1d"] = rolling_obj.median()
-        ordered["rolling_iqr_target_1d"] = rolling_obj.quantile(0.75) - rolling_obj.quantile(0.25)
-        ordered["rolling_outlier_ratio_target_1d"] = rolling_obj.apply(
-            _outlier_ratio, raw=False
-        )
-
-        # Compute IntradayRange-derived features
-        if "IntradayRange" not in ordered.columns:
-            raise KeyError("Dataset missing 'IntradayRange' column required for intraday features.")
-        intraday = pd.to_numeric(ordered["IntradayRange"], errors="coerce")
-        rolling_std = intraday.rolling(
-            INTRADAY_ROLLING_WINDOW, min_periods=INTRADAY_ROLLING_WINDOW
-        ).std()
-        rolling_mean = intraday.rolling(
-            INTRADAY_ROLLING_WINDOW, min_periods=INTRADAY_ROLLING_WINDOW
-        ).mean()
-        zscore = (intraday - rolling_mean) / rolling_std
-        zscore = zscore.where(~np.isclose(rolling_std, 0.0), np.nan)
-
-        risk_series = pd.Series(pd.NA, index=ordered.index, dtype="object")
-        valid_idx = intraday.dropna().index
-        if valid_idx.size >= 3:
-            try:
-                risk_values = pd.qcut(
-                    intraday.loc[valid_idx],
-                    q=3,
-                    labels=["low_vol", "medium_vol", "high_vol"],
-                    duplicates="drop",
-                )
-                risk_series.loc[valid_idx] = risk_values.astype("object")
-            except ValueError:
-                risk_series.loc[valid_idx] = "medium_vol"
-        risk_cat = pd.Categorical(
-            risk_series,
-            categories=["low_vol", "medium_vol", "high_vol"],
-            ordered=True,
-        )
-        risk_codes = pd.Series(risk_cat.codes, index=ordered.index).replace(-1, np.nan)
-
-        ordered["intradayrange_volatility"] = rolling_std
-        ordered["intradayrange_zscore"] = zscore
-        ordered["intradayrange_risk_level"] = risk_series
-        ordered["intradayrange_risk_level_code"] = risk_codes
-
-        augmented.loc[ordered.index, [TARGET_COLUMN] + TARGET_FEATURE_COLUMNS + INTRADAY_FEATURE_COLUMNS] = ordered[
-            [TARGET_COLUMN] + TARGET_FEATURE_COLUMNS + INTRADAY_FEATURE_COLUMNS
-        ]
-    return augmented
+    enriched = expand_base_features(
+        augmented,
+        base_features=[INTRADAY_BASE_FEATURE],
+        target_shift=target_shift,
+        target_window=window,
+        volatility_window=INTRADAY_ROLLING_WINDOW,
+    )
+    return enriched
 
 
 def _collect_last_n_day_validation(
@@ -219,91 +171,6 @@ def _to_relative(path: Path | str, base: Path) -> str:
         return path_obj.relative_to(base).as_posix()
     except ValueError:
         return path_obj.as_posix()
-
-
-def _outlier_ratio(series: pd.Series) -> float:
-    if series.empty:
-        return float("nan")
-    q1 = series.quantile(0.25)
-    q3 = series.quantile(0.75)
-    iqr = q3 - q1
-    if np.isclose(iqr, 0.0):
-        return 0.0
-    lower = q1 - 1.5 * iqr
-    upper = q3 + 1.5 * iqr
-    mask = (series < lower) | (series > upper)
-    return float(mask.mean())
-
-
-def _compute_summary_stats(series: pd.Series) -> dict[str, float]:
-    quantiles = np.percentile(series, [25, 50, 75])
-    q1, median, q3 = map(float, quantiles)
-    return {
-        "count": int(series.count()),
-        "mean": float(series.mean()),
-        "std": float(series.std(ddof=1)),
-        "min": float(series.min()),
-        "q1": q1,
-        "median": median,
-        "q3": q3,
-        "max": float(series.max()),
-        "iqr": float(q3 - q1),
-        "skew": float(series.skew()),
-        "kurtosis": float(series.kurt()),
-    }
-
-
-def _plot_distribution_comparison(
-    series: pd.Series,
-    *,
-    ticker: str,
-    feature: str,
-    summary: dict[str, float],
-    output_dir: Path,
-    show: bool,
-) -> Path:
-    sns.set_theme(style="whitegrid")
-    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.5))
-
-    median = summary["median"]
-    q1 = summary["q1"]
-    q3 = summary["q3"]
-    iqr = summary["iqr"]
-    skew = summary["skew"]
-
-    sns.boxplot(y=series, color="#86c5da", ax=axes[0])
-    axes[0].set_title("Boxplot")
-    axes[0].set_ylabel("Value")
-    axes[0].axhline(median, ls="--", lw=1.1, color="tab:orange", label=f"median={median:.4f}")
-    axes[0].legend(loc="upper right")
-
-    bins = max(10, int(math.sqrt(summary["count"])))
-    sns.histplot(series, bins=bins, kde=False, ax=axes[1], color="#5d9fc7")
-    axes[1].set_title("Histogram")
-    axes[1].set_xlabel("Value")
-    axes[1].axvline(median, ls="--", lw=1.1, color="tab:orange")
-
-    sns.violinplot(y=series, inner="quartile", color="#b3a2c8", ax=axes[2])
-    axes[2].set_title("Violin plot")
-    axes[2].set_ylabel("Value")
-
-    suptitle = (
-        f"{CASE_NAME}\n"
-        f"{ticker} | {feature} | Q1={q1:.4f} | Q3={q3:.4f} | IQR={iqr:.4f} | "
-        f"median={median:.4f} | skew={skew:.3f}"
-    )
-    fig.suptitle(suptitle, fontsize=12, y=1.05)
-    fig.tight_layout()
-
-    safe_ticker = "".join(ch if ch.isalnum() else "_" for ch in ticker).strip("_") or "ticker"
-    safe_feature = "".join(ch if ch.isalnum() else "_" for ch in feature).strip("_") or "feature"
-    filename = f"{safe_ticker.lower()}_{safe_feature.lower()}_{CASE_ID}_distribution.png"
-    output_path = output_dir / filename
-    fig.savefig(output_path, dpi=300, bbox_inches="tight")
-    if show:
-        plt.show()
-    plt.close(fig)
-    return output_path
 
 
 def run_case(
@@ -466,14 +333,16 @@ def run_case(
 
     for feature in selected_features:
         series = _prepare_feature_series(df, selected_ticker, feature)
-        summary = _compute_summary_stats(series)
+        summary = compute_distribution_summary(series)
         summary_record = {"ticker": selected_ticker, "feature": feature, **summary}
         summary_records.append(summary_record)
 
-        figure_path = _plot_distribution_comparison(
+        figure_path = plot_distribution_grid(
             series,
             ticker=selected_ticker,
             feature=feature,
+            case_id=CASE_ID,
+            case_name=CASE_NAME,
             summary=summary,
             output_dir=distribution_dir,
             show=show_plots,

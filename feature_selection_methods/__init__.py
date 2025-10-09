@@ -15,6 +15,9 @@ from .case_2_wrapper_rfecv import run_case as run_case_2
 from .case_3_embedded_lasso import CASE_ID as CASE_3_ID
 from .case_3_embedded_lasso import CASE_NAME as CASE_3_NAME
 from .case_3_embedded_lasso import run_case as run_case_3
+from .case_7_tsla_feature_expansion import CASE_ID as CASE_7_ID
+from .case_7_tsla_feature_expansion import CASE_NAME as CASE_7_NAME
+from .case_7_tsla_feature_expansion import run_case as run_case_7
 from .settings import (
     AVAILABLE_CASE_IDS,
     DEFAULT_DATASET_FILENAME,
@@ -42,6 +45,7 @@ CASE_STUDIES: Tuple[CaseStudy, ...] = (
     CaseStudy(case_id=CASE_1_ID, title=CASE_1_NAME, runner=run_case_1),
     CaseStudy(case_id=CASE_2_ID, title=CASE_2_NAME, runner=run_case_2),
     CaseStudy(case_id=CASE_3_ID, title=CASE_3_NAME, runner=run_case_3),
+    CaseStudy(case_id=CASE_7_ID, title=CASE_7_NAME, runner=run_case_7),
 )
 
 _CASE_RUNNERS = {case.case_id: case.runner for case in CASE_STUDIES}

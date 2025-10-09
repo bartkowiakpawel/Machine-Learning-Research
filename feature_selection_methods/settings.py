@@ -88,6 +88,16 @@ FEATURE_SELECTION_CASES: Mapping[str, FeatureSelectionCase] = {
         top_k=None,
         tickers=("TSLA",),
     ),
+    "case_7": FeatureSelectionCase(
+        case_id="case_7",
+        name="Case 7: TSLA feature expansion diagnostics",
+        method="feature_expansion_diagnostics",
+        description="Augment TSLA features with target-aligned stats and visualize distributions via RainCloud/KDE/QQ.",
+        top_k=None,
+        tickers=("TSLA",),
+        target="target_1d",
+        target_source=None,
+    ),
 }
 
 
