@@ -40,4 +40,4 @@ output/
 results/
 checkpoints/
 models/
-drop_rise_classification/
+gpm_pipeline/
