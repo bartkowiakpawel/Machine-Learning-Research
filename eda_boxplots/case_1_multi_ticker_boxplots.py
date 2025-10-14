@@ -23,6 +23,10 @@ from core.shared_utils import (
     resolve_output_dir,
     save_dataframe,
 )
+from drop_rise_classification import (
+    DEFAULT_TICKER as CLASSIFICATION_TICKER,
+    prepare_classification_dataset,
+)
 
 try:
     from .settings import (
@@ -219,6 +223,19 @@ def run_case(
         print(f"Single feature boxplot index saved to: {single_index_path}")
     else:
         print("No single-feature boxplots were generated.")
+
+    if len(selected_tickers) == 1 and selected_tickers[0] == CLASSIFICATION_TICKER:
+        dataset_path = ML_INPUT_DIR / dataset_filename
+        prepare_classification_dataset(
+            dataset=data,
+            case_output_dir=case_output_dir,
+            case_id=CASE_ID,
+            case_name=CASE_NAME,
+            dataset_filename=str(dataset_path.resolve()),
+            ticker=CLASSIFICATION_TICKER,
+            base_features=selected_features,
+            show_plots=show_plots,
+        )
 
     return case_output_dir
 

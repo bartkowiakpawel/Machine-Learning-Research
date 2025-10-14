@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 from pathlib import Path
 from typing import Mapping
@@ -14,11 +15,8 @@ from scipy import stats
 
 try:
     import ptitprince as pt
-except ImportError as exc:  # pragma: no cover - optional dependency safeguard
-    raise ImportError(
-        "The 'ptitprince' package is required for RainCloud plots. "
-        "Install it via 'pip install ptitprince'."
-    ) from exc
+except ImportError:  # pragma: no cover - optional dependency safeguard
+    pt = None
 
 
 def compute_distribution_summary(series: pd.Series) -> dict[str, float]:
@@ -97,9 +95,21 @@ def plot_distribution_grid(
     axes[2].set_ylabel("Value")
 
     # RainCloud plot
-    pt.RainCloud(y=clean, bw=0.2, width_viol=0.6, ax=axes[3], move=0.0, pointplot=False, alpha=0.85)
-    axes[3].set_title("RainCloud Plot")
-    axes[3].set_ylabel("Value")
+    rain_ax = axes[3]
+    rain_ax.set_title("RainCloud Plot")
+    rain_ax.set_ylabel("Value")
+    if pt is not None:
+        pt.RainCloud(y=clean, bw=0.2, width_viol=0.6, ax=rain_ax, move=0.0, pointplot=False, alpha=0.85)
+    else:
+        rain_ax.text(
+            0.5,
+            0.5,
+            "ptitprince not installed\nRainCloud skipped",
+            transform=rain_ax.transAxes,
+            ha="center",
+            va="center",
+        )
+        rain_ax.set_yticks([])
 
     # KDE plot
     kde_ax = axes[4]
@@ -129,7 +139,18 @@ def plot_distribution_grid(
 
     safe_ticker = "".join(ch if ch.isalnum() else "_" for ch in ticker).strip("_") or "ticker"
     safe_feature = "".join(ch if ch.isalnum() else "_" for ch in feature).strip("_") or "feature"
-    filename = f"{safe_ticker.lower()}_{safe_feature.lower()}_{case_id}_distribution.png"
+
+    max_token_length = 64
+    def _truncate_token(token: str) -> str:
+        if len(token) <= max_token_length:
+            return token
+        digest = hashlib.sha1(token.encode("utf-8")).hexdigest()[:10]
+        trimmed = token[: max_token_length - 12].rstrip("_")
+        return f"{trimmed}_{digest}"
+
+    safe_feature = _truncate_token(safe_feature.lower())
+    safe_ticker = _truncate_token(safe_ticker.lower())
+    filename = f"{safe_ticker}_{safe_feature}_{case_id}_distribution.png"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / filename
