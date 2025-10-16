@@ -90,6 +90,24 @@ _CASE_CONFIGS: Mapping[str, CaseConfig] = {
         ),
         tickers=("TSLA",),
     ),
+    "case_9": CaseConfig(
+        case_id="case_9",
+        name="Case 9: Multi-ticker classification with time-series CV baseline",
+        description=(
+            "Combine classification datasets from multiple tickers before running feature screening, RFECV, "
+            "and model benchmarking to evaluate the impact of a broader training universe."
+        ),
+        tickers=None,
+    ),
+    "case_10": CaseConfig(
+        case_id="case_10",
+        name="Case 10: Multi-ticker classification with compact feature expansion",
+        description=(
+            "Reuse the multi-ticker pipeline while leveraging compact feature expansion and lightweight pruning to "
+            "control dimensionality before RFECV and model benchmarking."
+        ),
+        tickers=None,
+    ),
 }
 
 
