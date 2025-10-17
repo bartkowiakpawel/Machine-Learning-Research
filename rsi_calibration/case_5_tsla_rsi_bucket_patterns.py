@@ -70,7 +70,7 @@ def _finalise_pattern_summary(summary: pd.DataFrame) -> pd.DataFrame:
 
 def _summarise_patterns(df: pd.DataFrame) -> pd.DataFrame:
     grouped = (
-        df.groupby(["RSI_bucket", "pattern"])
+        df.groupby(["RSI_bucket", "pattern"], observed=False)
         .size()
         .unstack(fill_value=0)
     )

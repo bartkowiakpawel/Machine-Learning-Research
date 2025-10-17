@@ -81,8 +81,8 @@ def _prepare_rsi_table(
             }
         ).dropna()
 
-        grouped = df.groupby("RSI_bucket")["future_return"].mean().reindex(labels)
-        counts = df.groupby("RSI_bucket")["future_return"].size().reindex(labels, fill_value=0)
+        grouped = df.groupby("RSI_bucket", observed=False)["future_return"].mean().reindex(labels)
+        counts = df.groupby("RSI_bucket", observed=False)["future_return"].size().reindex(labels, fill_value=0)
 
         for bucket_label, mean_return in grouped.items():
             long_records.append(

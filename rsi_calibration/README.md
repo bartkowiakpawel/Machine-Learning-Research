@@ -50,6 +50,27 @@ Pakiet `rsi_calibration` zawiera eksperymentalne pipeline’y związane z kalibr
 - Dane wyjściowe obejmują pivot (`*_heatmap_data.csv`), liczbę obserwacji na koszyk (`*_bucket_counts.csv`), tabelę PNG/HTML i wykres heatmap PNG.
 - Umożliwia szybkie sprawdzenie, czy np. RSI < 25 przekłada się na dodatnie wyniki po 21 dniach.
 
+### Case 6: `case_6_tsla_rsi_period_bias.py`
+- Porównuje średni bias przyszłych stóp zwrotu dla różnych okresów RSI na horyzontach 1/7/14/21 dni.
+- Generuje zestawienia w układzie szerokim i długim (`*_bias_summary.csv`, `*_bias_long.csv`), osobny ranking najlepszych/najsłabszych okresów (`*_bias_rankings.csv`) oraz wypisuje najlepszy i najsłabszy okres dla każdego horyzontu. Dodatkowo wersje przygotowane do prezentacji w tabelach GT zapisuje jako CSV (`*_bias_table_display.csv`, `*_bias_rankings_display.csv`).
+- Przy zainstalowanym `great_tables` zapisuje dodatkowe tabele PNG/HTML z porównaniem okresów RSI oraz rankingami.
+- W trakcie obliczeń wymusza deterministyczność przez ustawienie ziarna losowości `np.random.seed(42)`.
+
+### Case 7: `case_7_tsla_rsi_period_model_comparison.py`
+- Wykorzystuje ten sam zestaw modeli bazowych co Case 1/3 i porównuje ich skuteczność dla RSI 5/14/21/50 przy targetach 1/7/14/21 dni.
+- Generuje komplet metryk (`*_metrics.csv`), migawkę danych (`*_dataset_snapshot.csv`), listę najlepszych kombinacji model+RSI+target (`*_best_combos.csv`), a także przestawione tabele dokładności i modeli (`*_best_accuracy_pivot.csv`, `*_best_accuracy_display.csv`, `*_best_model_display.csv`, `*_horizon_top_models.csv`).
+- Jeśli dostępne `great_tables`, zapisuje także tabele PNG/HTML z macierzą dokładności oraz rankingiem modeli dla każdej konfiguracji.
+
+### Case 8: `case_8_tsla_rsi50_bucket_patterns.py`
+- Skupia się na RSI-50 i horyzoncie 21 dni, korzystając z tych samych koszyków RSI co Case 5.
+- Zapisuje szczegółowy rozkład drop/rise dla horyzontu 21 dni (`*_rsi50_h21_patterns.csv`), wersję łączną (`*_rsi50_combined_patterns.csv`) oraz długi format (`*_rsi50_long.csv`).
+- Przy dostępnej bibliotece `great_tables` generuje tabelę PNG/HTML dla koszyków i wypisuje najistotniejsze statystyki (np. największy udział spadków/wzrostów).
+
+### Case 9: `case_9_tsla_rsi_bucket_distribution.py`
+- Buduje rozkład liczby obserwacji w klasycznych koszykach RSI (<30, [30, 70), >=70) dla okresów 7/14/21/50 i horyzontów 1/5/14/21 dni.
+- Zapisuje pełny widok długi (`*_bucket_counts_long.csv`) oraz dla każdego okresu oddzielne pivota z liczebnościami i udziałami (`*_rsi*_count_pivot.csv`, `*_rsi*_share_pivot.csv`).
+- Przy włączonym `great_tables` generuje tabele PNG/HTML pokazujące macierze zliczeń i udziałów; dodatkowo w logach drukuje sumy obserwacji na horyzont.
+
 ### (Opcjonalnie) `case_1_metrics_table_demo.py`
 - Pomocniczy renderer, który na podstawie pliku `*_metrics.csv` generuje dodatkową tabelę PNG+HTML z nagłówkiem oraz notatkami interpretacyjnymi.
 - Dodatkowo zapisuje słownik kolumn (`*_metrics_glossary.csv/html`) opisujący znaczenie każdej metryki.
