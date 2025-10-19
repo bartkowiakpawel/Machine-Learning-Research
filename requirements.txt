@@ -1,3 +1,6 @@
+anthropic==0.34.2
+autogen-agentchat==0.7.5
+autogen-core==0.7.5
 beautifulsoup4==4.13.5
 certifi==2025.8.3
 cffi==2.0.0
@@ -7,14 +10,18 @@ curl_cffi==0.13.0
 cycler==0.12.1
 fonttools==4.60.0
 frozendict==2.4.6
+google-generativeai==0.8.2
 great-tables==0.19.0
 idna==3.10
+jsonref==1.1.0
 joblib==1.5.2
 kiwisolver==1.4.9
 lightgbm==4.6.0
 matplotlib==3.10.6
 multitasking==0.0.12
 numpy==2.3.3
+openai==1.51.0
+opentelemetry-api==1.38.0
 packaging==25.0
 pandas==2.3.2
 peewee==3.18.2
@@ -22,6 +29,7 @@ pillow==11.3.0
 platformdirs==4.4.0
 protobuf==6.32.1
 pycparser==2.23
+pyautogen==0.10.0
 pyparsing==3.2.5
 python-dateutil==2.9.0.post0
 pytz==2025.2
