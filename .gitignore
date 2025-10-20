@@ -42,3 +42,7 @@ results/
 checkpoints/
 models/
 gpm_pipeline/
+
+# Freeze debate package - keep on GitHub but ignore local changes
+llms_science_debate/
+
