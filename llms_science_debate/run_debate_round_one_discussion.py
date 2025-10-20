@@ -17,7 +17,7 @@ except (ImportError, AttributeError):
 from llms_science_debate.config import ANTHROPIC_API_KEY, MODELS, OPENAI_API_KEY  # noqa: E402
 
 DATA_DIR = PROJECT_ROOT / "input_data"
-OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR = PROJECT_ROOT / "reasoning_outputs"
 
 
 def _require_file(path: Path) -> str:

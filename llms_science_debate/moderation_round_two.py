@@ -16,7 +16,7 @@ except (ImportError, AttributeError):
 
 from llms_science_debate.config import GROQ_API_KEY, MODELS  # noqa: E402
 
-OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR = PROJECT_ROOT / "reasoning_outputs"
 ROUND_ONE_SUMMARY = OUTPUT_DIR / "round_one_summary.md"
 ROUND_TWO_TRANSCRIPT = OUTPUT_DIR / "round_two_transcript.md"
 ROUND_TWO_SUMMARY = OUTPUT_DIR / "round_two_summary.md"
