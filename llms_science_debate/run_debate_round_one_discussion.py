@@ -1,22 +1,20 @@
-"""Entry point for running the first-round multi-LLM debate."""
+"""Entry point for running the first-round multi-LLM debate (discussion only)."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-from pyautogen import AssistantAgent, GroupChat, GroupChatManager
-
 PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT.parent) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT.parent))
 
-from llms_science_debate.config import (  # noqa: E402
-    ANTHROPIC_API_KEY,
-    GEMINI_API_KEY,
-    MODELS,
-    OPENAI_API_KEY,
-)
+try:
+    from pyautogen import AssistantAgent, GroupChat, GroupChatManager  # type: ignore[attr-defined]
+except (ImportError, AttributeError):
+    from llms_science_debate.autogen_compat import AssistantAgent, GroupChat, GroupChatManager
+
+from llms_science_debate.config import ANTHROPIC_API_KEY, MODELS, OPENAI_API_KEY  # noqa: E402
 
 DATA_DIR = PROJECT_ROOT / "input_data"
 OUTPUT_DIR = PROJECT_ROOT / "output"
@@ -62,27 +60,27 @@ Analyze the ML experiment results and code.
 - CSV results snapshot:
 {csv_block}
 
-Focus on overfitting and suggest improvements.
+You are contributing to a purely theoretical, academic discussion about machine-learning feature engineering.
+All commentary must remain educational and research-oriented with no financial guidance of any kind.
+Share your viewpoint on the evidence, highlight methodological strengths/weaknesses, and recommend scientific next steps.
 """.strip()
 
-    gemini_config = _build_llm_config("gemini_flash", GEMINI_API_KEY, "google")
     claude_config = _build_llm_config("claude_haiku", ANTHROPIC_API_KEY, "anthropic")
     openai_config = _build_llm_config("openai_full", OPENAI_API_KEY, "openai")
 
-    gemini = AssistantAgent(name="Gemini", llm_config=gemini_config)
     claude = AssistantAgent(name="Claude", llm_config=claude_config)
-    gpt = AssistantAgent(name="GPT", llm_config=openai_config, system_message="Moderator")
+    gpt = AssistantAgent(
+        name="GPT",
+        llm_config=openai_config,
+        system_message="Provide an academic, theoretical perspective on the discussion.",
+    )
 
-    groupchat = GroupChat(agents=[gemini, claude, gpt], messages=[])
+    groupchat = GroupChat(agents=[gpt, claude], messages=[])
     manager = GroupChatManager(groupchat=groupchat, llm_config=openai_config)
 
     groupchat.initiate_chat(manager, message=user_prompt)
 
-    summary_path = OUTPUT_DIR / "round_one_summary.md"
-    summary_path.write_text(groupchat.messages[-1]["content"], encoding="utf-8")
-    print(f"Debate summary saved to {summary_path}")
-
-    transcript_lines = ["# LLM Debate Transcript", ""]
+    transcript_lines = ["# LLM Debate Transcript (Round 1)", ""]
     for message in groupchat.messages:
         speaker = message.get("name") or message.get("role", "unknown")
         content = message.get("content", "")
@@ -93,7 +91,7 @@ Focus on overfitting and suggest improvements.
 
     transcript_path = OUTPUT_DIR / "round_one_transcript.md"
     transcript_path.write_text("\n".join(transcript_lines), encoding="utf-8")
-    print(f"Full transcript saved to {transcript_path}")
+    print(f"Round 1 transcript saved to {transcript_path}")
 
 
 if __name__ == "__main__":

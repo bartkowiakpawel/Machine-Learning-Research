@@ -1,4 +1,15 @@
-"""Regime filter analysis using SMA-200 for TSLA."""
+"""Run a SMA-200 regime analysis for TSLA daily data. The script loads the
+technical feature dataset, computes forward returns for the selected horizons,
+labels each day as above or below the 200-day average, and aggregates regime
+probabilities together with average and median forward returns. It also derives
+lift metrics, produces static plots/HTML wrappers, and optionally exports Great
+Tables views when the dependency is available.
+
+CSV outputs:
+- tsla_sma200_regime_enriched.csv — per-day features with forward returns and the above/below SMA-200 regime label.
+- tsla_sma200_regime_summary.csv — per-horizon sample counts plus rise/drop/flat probabilities and return statistics split by regime.
+- tsla_sma200_regime_lift.csv — above-minus-below SMA-200 differences for each probability and return metric across horizons.
+"""
 
 from __future__ import annotations
 

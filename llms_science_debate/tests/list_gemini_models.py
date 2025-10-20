@@ -19,14 +19,28 @@ def main() -> None:
     print("Listing Gemini models available for this API key:\n")
 
     models = list(genai.list_models())
+    output_lines = ["# Google Gemini Models", ""]
     if not models:
         print("No models returned. Check API key permissions in Google AI Studio.")
+        output_lines.append("_No models returned for this API key._")
+        _write_output(output_lines)
         return
 
     for model in models:
         methods = getattr(model, "supported_generation_methods", None)
         methods_display = ", ".join(sorted(methods)) if methods else "n/a"
         print(f"- {model.name} :: methods={methods_display}")
+        output_lines.append(f"- {model.name} (methods={methods_display})")
+
+    _write_output(output_lines)
+
+
+def _write_output(lines: list[str]) -> None:
+    output_dir = Path(__file__).resolve().parent / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "gemini_models.md"
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"\nModel list saved to {output_path}")
 
 
 if __name__ == "__main__":
